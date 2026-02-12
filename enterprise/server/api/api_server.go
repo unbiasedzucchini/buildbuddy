@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/buildbuddy-io/buildbuddy/enterprise/server/auditlog"
 	"github.com/buildbuddy-io/buildbuddy/enterprise/server/backends/prom"
 	"github.com/buildbuddy-io/buildbuddy/enterprise/server/hostedrunner"
 	"github.com/buildbuddy-io/buildbuddy/proto/workflow"
@@ -22,6 +24,8 @@ import (
 	"github.com/buildbuddy-io/buildbuddy/server/remote_cache/digest"
 	"github.com/buildbuddy-io/buildbuddy/server/tables"
 	"github.com/buildbuddy-io/buildbuddy/server/util/capabilities"
+	"github.com/buildbuddy-io/buildbuddy/server/util/claims"
+	"github.com/buildbuddy-io/buildbuddy/server/util/clickhouse/schema"
 	"github.com/buildbuddy-io/buildbuddy/server/util/db"
 	"github.com/buildbuddy-io/buildbuddy/server/util/flag"
 	"github.com/buildbuddy-io/buildbuddy/server/util/log"
@@ -37,6 +41,7 @@ import (
 	requestcontext "github.com/buildbuddy-io/buildbuddy/server/util/request_context"
 
 	apipb "github.com/buildbuddy-io/buildbuddy/proto/api/v1"
+	alpb "github.com/buildbuddy-io/buildbuddy/proto/auditlog"
 	bespb "github.com/buildbuddy-io/buildbuddy/proto/build_event_stream"
 	cappb "github.com/buildbuddy-io/buildbuddy/proto/capability"
 	elpb "github.com/buildbuddy-io/buildbuddy/proto/eventlog"
@@ -52,6 +57,12 @@ var (
 	enableCache          = flag.Bool("api.enable_cache", false, "Whether or not to enable the API cache.")
 	enableCacheDeleteAPI = flag.Bool("enable_cache_delete_api", false, "If true, enable access to cache delete API.")
 	enableMetricsAPI     = flag.Bool("api.enable_metrics_api", false, "If true, enable access to metrics API.")
+)
+
+const (
+	minAuditLogPageSize     = 1
+	defaultAuditLogPageSize = 100
+	maxAuditLogPageSize     = 1_000
 )
 
 type APIServer struct {
@@ -384,6 +395,134 @@ func (s *APIServer) GetLog(ctx context.Context, req *apipb.GetLogRequest) (*apip
 			Contents: string(resp.GetBuffer()),
 		},
 		NextPageToken: resp.GetNextChunkId(),
+	}, nil
+}
+
+func (s *APIServer) GetAuditLog(ctx context.Context, req *apipb.GetAuditLogRequest) (*apipb.GetAuditLogResponse, error) {
+	selector := req.GetSelector()
+	if selector == nil {
+		selector = &apipb.AuditLogSelector{}
+	}
+
+	startTime := selector.GetStartTime()
+	if startTime == nil {
+		startTime = timestamppb.New(time.Unix(0, 0))
+	}
+	if err := startTime.CheckValid(); err != nil {
+		return nil, status.InvalidArgumentErrorf("invalid start_time: %s", err)
+	}
+
+	endTime := selector.GetEndTime()
+	if endTime == nil {
+		endTime = timestamppb.Now()
+	}
+	if err := endTime.CheckValid(); err != nil {
+		return nil, status.InvalidArgumentErrorf("invalid end_time: %s", err)
+	}
+	if startTime.AsTime().After(endTime.AsTime()) {
+		return nil, status.InvalidArgumentErrorf("start_time must not be after end_time")
+	}
+
+	if s.env.GetAuditLogger() == nil || s.env.GetOLAPDBHandle() == nil {
+		return nil, status.UnimplementedError("Audit logger not configured")
+	}
+
+	// Check whether the user is authenticated. No need for the returned user
+	// here, because user filters will be applied before returning entries.
+	user, err := s.env.GetAuthenticator().AuthenticatedUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	userCaps, err := capabilities.ForAuthenticatedUser(ctx, s.env.GetAuthenticator())
+	if err != nil {
+		return nil, err
+	}
+	if !slices.Contains(userCaps, cappb.Capability_ORG_ADMIN) && !slices.Contains(userCaps, cappb.Capability_AUDIT_LOG_READ) {
+		return nil, status.PermissionDeniedError("missing required capabilities")
+	}
+	isServerAdmin := claims.AuthorizeServerAdmin(ctx) == nil
+
+	pageSize := req.GetPageSize()
+	if pageSize < minAuditLogPageSize {
+		pageSize = defaultAuditLogPageSize
+	}
+	pageSize = min(pageSize, maxAuditLogPageSize)
+	startUsec := startTime.AsTime().UnixMicro()
+	endUsec := endTime.AsTime().UnixMicro()
+
+	q := query_builder.NewQuery(`SELECT * FROM AuditLogs`)
+	q.AddWhereClause("group_id = ?", user.GetGroupID())
+	q.AddWhereClause("event_time_usec >= ?", startUsec)
+	q.AddWhereClause("event_time_usec < ?", endUsec)
+	if req.GetPageToken() != "" {
+		token, err := parseAuditLogPageToken(req.GetPageToken())
+		if err != nil {
+			return nil, err
+		}
+		q.AddWhereClause("(event_time_usec, audit_log_id) > (?, ?)", token.EventTimeUsec, token.AuditLogID)
+	}
+	// Match AuditLogs sort key to keep keyset pagination index-friendly.
+	q.SetOrderBy("group_id, event_time_usec, audit_log_id", true)
+	// Request one extra row as lookahead so we can determine whether a next
+	// page exists without issuing an additional query.
+	q.SetLimit(int64(pageSize + 1))
+	queryStr, args := q.Build()
+
+	rq := s.env.GetOLAPDBHandle().NewQuery(ctx, "api_server_get_audit_logs").Raw(queryStr, args...)
+	rsp := &apipb.GetAuditLogResponse{}
+	var lastReturnedToken auditLogPageToken
+	err = db.ScanEach(rq, func(ctx context.Context, row *schema.AuditLog) error {
+		if len(rsp.Entry) == int(pageSize) {
+			rsp.NextPageToken = encodeAuditLogPageToken(lastReturnedToken)
+			return nil
+		}
+
+		entry, err := auditlog.EntryFromDBRow(row)
+		if err != nil {
+			return err
+		}
+		if !isServerAdmin && strings.HasSuffix(row.AuthUserEmail, "@buildbuddy.io") {
+			entry.AuthenticationInfo.User = &alpb.AuthenticatedUser{
+				UserEmail: "Buildbuddy Admin",
+			}
+			entry.AuthenticationInfo.ClientIp = "0.0.0.0"
+		}
+
+		rsp.Entry = append(rsp.Entry, entry)
+		lastReturnedToken = auditLogPageToken{
+			EventTimeUsec: row.EventTimeUsec,
+			AuditLogID:    row.AuditLogID,
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return rsp, nil
+}
+
+type auditLogPageToken struct {
+	EventTimeUsec int64
+	AuditLogID    string
+}
+
+func encodeAuditLogPageToken(token auditLogPageToken) string {
+	return fmt.Sprintf("%d|%s", token.EventTimeUsec, token.AuditLogID)
+}
+
+func parseAuditLogPageToken(pageToken string) (auditLogPageToken, error) {
+	ts, id, ok := strings.Cut(pageToken, "|")
+	if !ok || id == "" {
+		return auditLogPageToken{}, status.InvalidArgumentErrorf("invalid page_token")
+	}
+	eventTimeUsec, err := strconv.ParseInt(ts, 10, 64)
+	if err != nil {
+		return auditLogPageToken{}, status.InvalidArgumentErrorf("invalid page_token")
+	}
+	return auditLogPageToken{
+		EventTimeUsec: eventTimeUsec,
+		AuditLogID:    id,
 	}, nil
 }
 

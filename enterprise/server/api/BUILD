@@ -7,8 +7,10 @@ go_library(
     srcs = ["api_server.go"],
     importpath = "github.com/buildbuddy-io/buildbuddy/enterprise/server/api",
     deps = [
+        "//enterprise/server/auditlog",
         "//enterprise/server/backends/prom",
         "//enterprise/server/hostedrunner",
+        "//proto:auditlog_go_proto",
         "//proto:build_event_stream_go_proto",
         "//proto:capability_go_proto",
         "//proto:eventlog_go_proto",
@@ -29,6 +31,8 @@ go_library(
         "//server/remote_cache/digest",
         "//server/tables",
         "//server/util/capabilities",
+        "//server/util/claims",
+        "//server/util/clickhouse/schema",
         "//server/util/db",
         "//server/util/flag",
         "//server/util/log",
@@ -50,9 +54,11 @@ go_test(
     data = glob(["testdata/**"]),
     embed = [":api"],
     deps = [
+        "//enterprise/server/auditlog",
         "//enterprise/server/experiments",
         "//enterprise/server/testutil/enterprise_testauth",
         "//enterprise/server/testutil/enterprise_testenv",
+        "//proto:auditlog_go_proto",
         "//proto:build_event_stream_go_proto",
         "//proto:build_events_go_proto",
         "//proto:capability_go_proto",
@@ -84,5 +90,6 @@ go_test(
         "@org_golang_google_protobuf//encoding/protojson",
         "@org_golang_google_protobuf//types/known/anypb",
         "@org_golang_google_protobuf//types/known/durationpb",
+        "@org_golang_google_protobuf//types/known/timestamppb",
     ],
 )

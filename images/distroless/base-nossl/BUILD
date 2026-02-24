@@ -1,58 +1,8 @@
-load("@rules_distroless//distroless:defs.bzl", "cacerts", "flatten", "group", "java_keystore", "passwd")
-load("@rules_distroless//apt:defs.bzl", "dpkg_statusd")
+load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_img//img:image.bzl", "image_index", "image_manifest")
 load("@rules_img//img:load.bzl", "image_load")
 
 package(default_visibility = ["//visibility:public"])
-
-# Create group entries (similar to groupadd)
-group(
-    name = "groups",
-    entries = [
-        # Root group
-        dict(
-            name = "root",
-            gid = 0,
-            users = ["root"],
-        ),
-    ],
-)
-
-# Create passwd entries (similar to useradd/passwd)
-passwd(
-    name = "passwd",
-    entries = [
-        # Root user
-        dict(
-            gecos = ["root"],
-            gid = 0,
-            home = "/root",
-            shell = "/bin/bash",
-            uid = 0,
-            username = "root",
-        ),
-    ],
-)
-
-# Generate CA certificates bundle
-cacerts(
-    name = "ca_certificates",
-    package = "@trixie//ca-certificates/amd64:data",
-    # the cacerts rule currently doesn't support running on Windows
-    target_compatible_with = select({
-        "@platforms//os:windows": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
-)
-
-# Create a Java keystore with custom certificates
-java_keystore(
-    name = "custom_java_keystore",
-    certificates = [
-        "//images:custom-ca.crt",
-        "//images:internal-root.crt",
-    ],
-)
 
 [
     flatten(
@@ -66,12 +16,8 @@ java_keystore(
             }[arch],
         ],
         tars = [
-            # "@trixie//:dpkg_status",
-            "@trixie//base-files/%s:data" % arch,
-            "@trixie//netbase/%s:data" % arch,
-            "@trixie//tzdata/%s:data" % arch,
-            "@trixie//media-types/%s:data" % arch,
-            "@trixie//libc6/%s:data" % arch,
+            "//images/distroless/static:layer_%s" % arch,
+            "@trixie//libc6:libc6",
 
             # These are included in the distroless base image for debian, but
             # not *currently* needed for buildbuddy. We can uncomment these if
@@ -81,10 +27,6 @@ java_keystore(
             # "@trixie//libzstd1/%s:data" % arch,
             # "@trixie//zlib1g/%s:data" % arch,
 
-            ":groups",
-            ":passwd",
-            ":ca_certificates",
-            ":custom_java_keystore",
         ],
         tags = ["manual"],
     )
@@ -128,6 +70,6 @@ image_index(
 image_load(
     name = "load",
     image = ":index",  # References an image_index
-    tag = "bb-distroless_static:latest",
+    tag = "bb-distroless_base-nossl:latest",
     daemon = "docker",  # Explicitly use docker
 )

@@ -8,6 +8,7 @@ package(default_visibility = ["//visibility:public"])
     flatten(
         name = "layer_%s" % arch,
         compress = "gzip",
+        tags = ["manual"],
         target_compatible_with = [
             "@platforms//os:linux",
             "@platforms//cpu:%s" % {
@@ -16,7 +17,6 @@ package(default_visibility = ["//visibility:public"])
             }[arch],
         ],
         tars = ["@trixie//libc6:libc6"],
-        tags = ["manual"],
     )
     for arch in [
         "amd64",
@@ -32,8 +32,8 @@ image_manifest(
         "@platforms//cpu:arm64": [":layer_arm64"],
         "@platforms//cpu:x86_64": [":layer_amd64"],
     }),
-    user = "root",
     tags = ["manual"],
+    user = "root",
 )
 
 image_index(
@@ -43,6 +43,7 @@ image_index(
         "//platforms:linux_x86_64",
         "//platforms:linux_arm64",
     ],
+    tags = ["manual"],
     target_compatible_with = select({
         # the cacerts target referenced
         # from here currently doesn't
@@ -50,14 +51,13 @@ image_index(
         "@platforms//os:windows": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
-    tags = ["manual"],
 )
 
 # Load a multi-platform image
 image_load(
     name = "load",
+    daemon = "docker",  # Explicitly use docker
     image = ":index",  # References an image_index
     tag = "bb-distroless_base-nossl:latest",
-    daemon = "docker",  # Explicitly use docker
     tags = ["manual"],
 )

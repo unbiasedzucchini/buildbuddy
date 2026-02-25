@@ -4,11 +4,6 @@ load("@rules_img//img:load.bzl", "image_load")
 
 package(default_visibility = ["//visibility:public"])
 
-exports_files([
-    "custom-ca.crt",
-    "internal-root.crt",
-])
-
 # Create group entries (similar to groupadd)
 group(
     name = "groups",

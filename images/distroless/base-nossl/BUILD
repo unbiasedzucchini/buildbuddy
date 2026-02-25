@@ -15,19 +15,7 @@ package(default_visibility = ["//visibility:public"])
                 "arm64": "aarch64",
             }[arch],
         ],
-        tars = [
-            "//images/distroless/static:layer_%s" % arch,
-            "@trixie//libc6:libc6",
-
-            # These are included in the distroless base image for debian, but
-            # not *currently* needed for buildbuddy. We can uncomment these if
-            # we start depending on them.
-
-            # "@trixie//libssl3t64/%s:data" % arch,
-            # "@trixie//libzstd1/%s:data" % arch,
-            # "@trixie//zlib1g/%s:data" % arch,
-
-        ],
+        tars = ["@trixie//libc6:libc6"],
         tags = ["manual"],
     )
     for arch in [
@@ -39,15 +27,13 @@ package(default_visibility = ["//visibility:public"])
 # Create a complete distroless static image with all features
 image_manifest(
     name = "manifest",
-    env = {
-        "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-        "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
-    },
+    base = "//images/distroless/static:manifest",
     layers = select({
         "@platforms//cpu:arm64": [":layer_arm64"],
         "@platforms//cpu:x86_64": [":layer_amd64"],
     }),
     user = "root",
+    tags = ["manual"],
 )
 
 image_index(
@@ -64,6 +50,7 @@ image_index(
         "@platforms//os:windows": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
+    tags = ["manual"],
 )
 
 # Load a multi-platform image
@@ -72,4 +59,5 @@ image_load(
     image = ":index",  # References an image_index
     tag = "bb-distroless_base-nossl:latest",
     daemon = "docker",  # Explicitly use docker
+    tags = ["manual"],
 )

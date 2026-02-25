@@ -1,11 +1,9 @@
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
-load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load("//rules:utils.bzl", "runfiles_directory")
 load("@rules_img//img:image.bzl", "image_index", "image_manifest")
-load("@rules_img//img:layer.bzl", "image_layer", "layer_from_tar")
 load("@rules_img//img:load.bzl", "image_load")
 
 # gazelle:default_visibility //enterprise:__subpackages__,@buildbuddy_internal//:__subpackages__
@@ -114,48 +112,6 @@ go_binary(
     embed = [":server_lib"],
 )
 
-image_layer(
-    name = "symlinks_layer",
-    symlinks = {
-        "config.yaml": "app/enterprise/server/cmd/server/buildbuddy.runfiles/%s/enterprise/config/buildbuddy.release.yaml" % runfiles_directory(),
-        "/app/enterprise/server/cmd/server/buildbuddy": "/app/enterprise/server/cmd/server/buildbuddy.runfiles/%s/enterprise/server/cmd/server/buildbuddy_/buildbuddy" % runfiles_directory(),
-    },
-    tags = ["manual"],
-)
-
-# The go_image below can be used to build and run the server image.
-# The container_image target just builds and tags the image without running it.
-
-image_manifest(
-    name = "manifest",
-    env = {
-        "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-        "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
-    },
-    layers = select({
-        "@platforms//cpu:arm64":
-        [
-            "//images/distroless/base-nossl:layer_arm64",
-            ":buildbuddy_layer",
-        ],
-        "@platforms//cpu:x86_64": [
-            "//images/distroless/base-nossl:layer_amd64",
-            ":buildbuddy_layer",
-        ],
-    }),
-    user = "root",
-    entrypoint = [
-        "/app/enterprise/server/cmd/server/buildbuddy",
-    ],
-)
-
-image_load(
-    name = "buildbuddy_image",
-    image = ":manifest",  # References an image_manifest
-    tag = "buildbuddy_image:latest",
-    daemon = "containerd",  # Explicitly use containerd
-)
-
 # TODO(sluongng): Verify the layering of the image.
 pkg_tar(
     name = "tar",
@@ -170,25 +126,23 @@ pkg_tar(
         "config.yaml": "app/enterprise/server/cmd/server/buildbuddy.runfiles/%s/enterprise/config/buildbuddy.release.yaml" % runfiles_directory(),
         "buildbuddy": "tmp",
     },
+    tags = ["manual"],
 )
 
-layer_from_tar(
-    name = "buildbuddy_layer",
-    src = ":tar",
+image_manifest(
+    name = "manifest",
+    base = "//images/distroless/base-nossl:manifest",
+    layers = [":buildbuddy_layer"],
+    entrypoint = [
+        "/app/enterprise/server/cmd/server/buildbuddy",
+    ],
+    tags = ["manual"],
 )
 
-oci_image(
-    name = "oci_image",
-    base = "@buildbuddy_go_oci_image_base",
-    entrypoint = ["/app/enterprise/server/cmd/server/buildbuddy"],
-    target_compatible_with = ["@platforms//os:linux"],
-    tars = [":tar"],
-    visibility = ["//visibility:public"],
-)
-
-oci_load(
-    name = "oci_load",
-    image = ":oci_image",
-    repo_tags = ["enterprise/server:oci_image"],
+image_load(
+    name = "buildbuddy_image",
+    image = ":manifest",
+    tag = "buildbuddy_image:latest",
+    daemon = "containerd",  # Explicitly use containerd
     tags = ["manual"],
 )

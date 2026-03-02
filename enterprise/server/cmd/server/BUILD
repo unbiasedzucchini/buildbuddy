@@ -1,3 +1,5 @@
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("@tar.bzl", "mtree_mutate", "mtree_spec", "mutate", "tar")
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
@@ -113,52 +115,22 @@ go_binary(
     embed = [":server_lib"],
 )
 
-PACKAGE_ROOT = "app/enterprise/server/cmd/server/buildbuddy.runfiles/%s" % runfiles_directory()
+PACKAGE_ROOT = "app/%s/buildbuddy.runfiles/%s" % (package_name(), runfiles_directory())
 
-pkg_tar(
-    name = "buildbuddy_tar",
-    package_dir = PACKAGE_ROOT + "/enterprise/server/cmd/server/buildbuddy_",
-    srcs = [
-        ":buildbuddy",
-    ],
+package_runfiles = mutate(
+    strip_prefix = "%s/buildbuddy_/buildbuddy.runfiles/%s" % (package_name(), runfiles_directory()),
+    package_dir = PACKAGE_ROOT,
+)
+
+tar(
+    name = "runfiles_tar",
+    srcs = [":buildbuddy"],
+    mutate = package_runfiles,
+    include_runfiles = True,
 )
 
 pkg_tar(
-    name = "licenses_tar",
-    package_dir = PACKAGE_ROOT + "/enterprise",
-    srcs = [
-        "//enterprise:licenses",
-    ],
-)
-
-pkg_tar(
-    name = "app_tar",
-    package_dir = PACKAGE_ROOT + "/enterprise/app",
-    srcs = [
-        "//enterprise/app:app_bundle",
-        "//enterprise/app:sha",
-        "//enterprise/app:style",
-    ],
-)
-
-pkg_tar(
-    name = "config_tar",
-    package_dir = PACKAGE_ROOT + "/enterprise/config",
-    srcs = [
-        "//enterprise/config:config_files",
-    ],
-)
-
-pkg_tar(
-    name = "static_tar",
-    package_dir = PACKAGE_ROOT + "/static",
-    srcs = [
-        "//static",
-    ],
-)
-
-pkg_tar(
-    name = "symlinks",
+    name = "symlinks_tar",
     symlinks = {
         "config.yaml": "/" + PACKAGE_ROOT + "/enterprise/config/buildbuddy.release.yaml",
         "buildbuddy": "tmp",
@@ -170,12 +142,8 @@ flatten(
     name = "layer",
     # compress = "gzip",
     tars = [
-        ":buildbuddy_tar",
-        ":licenses_tar",
-        ":app_tar",
-        ":config_tar",
-        ":static_tar",
-        ":symlinks",
+        ":runfiles_tar",
+        ":symlinks_tar",
     ],
 )
 

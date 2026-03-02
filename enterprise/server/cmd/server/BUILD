@@ -1,12 +1,12 @@
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
-load("@tar.bzl", "mtree_mutate", "mtree_spec", "mutate", "tar")
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_img//img:image.bzl", "image_index", "image_manifest")
 load("@rules_img//img:load.bzl", "image_load")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
-load("@rules_distroless//distroless:defs.bzl", "flatten")
+load("@tar.bzl", "mtree_mutate", "mtree_spec", "mutate", "tar")
 load("//rules:utils.bzl", "runfiles_directory")
 
 # gazelle:default_visibility //enterprise:__subpackages__,@buildbuddy_internal//:__subpackages__
@@ -115,18 +115,24 @@ go_binary(
     embed = [":server_lib"],
 )
 
-PACKAGE_ROOT = "app/%s/buildbuddy.runfiles/%s" % (package_name(), runfiles_directory())
+PACKAGE_ROOT = "app/%s/buildbuddy.runfiles/%s" % (
+    package_name(),
+    runfiles_directory(),
+)
 
 package_runfiles = mutate(
-    strip_prefix = "%s/buildbuddy_/buildbuddy.runfiles/%s" % (package_name(), runfiles_directory()),
     package_dir = PACKAGE_ROOT,
+    strip_prefix = "%s/buildbuddy_/buildbuddy.runfiles/%s" % (
+        package_name(),
+        runfiles_directory(),
+    ),
 )
 
 tar(
     name = "runfiles_tar",
     srcs = [":buildbuddy"],
-    mutate = package_runfiles,
     include_runfiles = True,
+    mutate = package_runfiles,
 )
 
 pkg_tar(

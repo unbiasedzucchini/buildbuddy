@@ -10,6 +10,7 @@ go_library(
         "//cli/arg",
         "//cli/log",
         "//cli/login",
+        "//cli/markdown",
         "//cli/terminal",
         "//proto:execution_stats_go_proto",
         "//proto:remote_execution_go_proto",

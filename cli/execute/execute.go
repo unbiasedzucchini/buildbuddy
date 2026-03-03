@@ -11,6 +11,7 @@ import (
 	"github.com/buildbuddy-io/buildbuddy/cli/executions"
 	"github.com/buildbuddy-io/buildbuddy/cli/log"
 	"github.com/buildbuddy-io/buildbuddy/cli/login"
+	"github.com/buildbuddy-io/buildbuddy/cli/markdown"
 	"github.com/buildbuddy-io/buildbuddy/server/real_environment"
 	"github.com/buildbuddy-io/buildbuddy/server/remote_cache/digest"
 	"github.com/buildbuddy-io/buildbuddy/server/util/bazel_request"
@@ -251,7 +252,8 @@ func execute(cmdArgs []string) error {
 			return fmt.Errorf("write json output: %w", err)
 		}
 	case "markdown":
-		if _, err := fmt.Fprint(os.Stdout, executions.RenderMarkdownWithDetails(rsp.GetName(), rsp.ExecuteResponse, logs)); err != nil {
+		markdownWriter := markdown.Writer(os.Stdout, nil)
+		if err := executions.WriteMarkdownWithDetails(markdownWriter, rsp.GetName(), rsp.ExecuteResponse, logs); err != nil {
 			return err
 		}
 	case "stdio":

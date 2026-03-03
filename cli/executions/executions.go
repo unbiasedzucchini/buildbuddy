@@ -15,6 +15,7 @@ import (
 	"github.com/buildbuddy-io/buildbuddy/cli/arg"
 	"github.com/buildbuddy-io/buildbuddy/cli/log"
 	"github.com/buildbuddy-io/buildbuddy/cli/login"
+	"github.com/buildbuddy-io/buildbuddy/cli/markdown"
 	"github.com/buildbuddy-io/buildbuddy/cli/terminal"
 	"github.com/buildbuddy-io/buildbuddy/server/util/grpc_client"
 	"github.com/buildbuddy-io/buildbuddy/server/util/rexec"
@@ -118,8 +119,11 @@ func handleGet(args []string) (int, error) {
 		return 0, err
 	}
 
-	_, err = fmt.Fprint(os.Stdout, RenderMarkdown(executionID, executeResponse))
-	return 0, err
+	markdownWriter := markdown.Writer(os.Stdout, nil)
+	if err := WriteMarkdown(markdownWriter, executionID, executeResponse); err != nil {
+		return 0, err
+	}
+	return 0, nil
 }
 
 func fetchExecuteResponse(ctx context.Context, target, executionID string) (*repb.ExecuteResponse, error) {
@@ -133,9 +137,9 @@ func fetchExecuteResponse(ctx context.Context, target, executionID string) (*rep
 	return rexec.GetCachedExecuteResponse(ctx, acClient, executionID)
 }
 
-// RenderMarkdown renders a human-friendly markdown summary of an ExecuteResponse.
-func RenderMarkdown(executionID string, executeResponse *repb.ExecuteResponse) string {
-	return RenderMarkdownWithDetails(executionID, executeResponse, nil)
+// WriteMarkdown writes a human-friendly markdown summary of an ExecuteResponse.
+func WriteMarkdown(w io.Writer, executionID string, executeResponse *repb.ExecuteResponse) error {
+	return WriteMarkdownWithDetails(w, executionID, executeResponse, nil)
 }
 
 type jsonOutput struct {
@@ -193,10 +197,9 @@ func WriteJSONOutput(w io.Writer, executionID string, executeResponse *repb.Exec
 	return nil
 }
 
-// RenderMarkdownWithDetails renders a human-friendly markdown summary of an
+// WriteMarkdownWithDetails writes a human-friendly markdown summary of an
 // ExecuteResponse, optionally including fetched stdout/stderr details.
-func RenderMarkdownWithDetails(executionID string, executeResponse *repb.ExecuteResponse, details *rexec.ExecutionLogs) string {
-	var b strings.Builder
+func WriteMarkdownWithDetails(w io.Writer, executionID string, executeResponse *repb.ExecuteResponse, details *rexec.ExecutionLogs) error {
 	statusCode := codes.Code(executeResponse.GetStatus().GetCode())
 	statusColor := colorForStatus(statusCode)
 	var stdout, stderr []byte
@@ -204,18 +207,17 @@ func RenderMarkdownWithDetails(executionID string, executeResponse *repb.Execute
 		stdout = details.Stdout
 		stderr = details.Stderr
 	}
-
-	b.WriteString(colorHeading("# Execution details\n"))
-	b.WriteString(fmt.Sprintf("- Execution ID: `%s`\n", executionID))
-	b.WriteString("- Stage: Completed\n")
-	b.WriteString(fmt.Sprintf("- RPC status: %s%s (%d)%s", statusColor, statusCode.String(), statusCode, terminal.Esc()))
+	io.WriteString(w, "# Execution details\n")
+	fmt.Fprintf(w, "- Execution ID: `%s`\n", executionID)
+	io.WriteString(w, "- Stage: Completed\n")
+	fmt.Fprintf(w, "- RPC status: %s%s (%d)%s", statusColor, statusCode.String(), statusCode, terminal.Esc())
 	if msg := executeResponse.GetStatus().GetMessage(); msg != "" {
-		b.WriteString(fmt.Sprintf(": %s", msg))
+		fmt.Fprintf(w, ": %s", msg)
 	}
-	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("- Served from cache: %s\n", yesNo(executeResponse.GetCachedResult())))
+	io.WriteString(w, "\n")
+	fmt.Fprintf(w, "- Served from cache: %s\n", yesNo(executeResponse.GetCachedResult()))
 	if msg := executeResponse.GetMessage(); msg != "" {
-		b.WriteString(fmt.Sprintf("- Message: %s\n", msg))
+		fmt.Fprintf(w, "- Message: %s\n", msg)
 	}
 
 	result := executeResponse.GetResult()
@@ -227,15 +229,15 @@ func RenderMarkdownWithDetails(executionID string, executeResponse *repb.Execute
 			stderr = result.GetStderrRaw()
 		}
 
-		b.WriteString("\n")
-		b.WriteString(colorHeading("# Result details\n"))
-		b.WriteString(fmt.Sprintf("- Exit code: %d\n", result.GetExitCode()))
-		b.WriteString(fmt.Sprintf("- Outputs: %d files, %d directories, %d symlinks\n", len(result.GetOutputFiles()), len(result.GetOutputDirectories()), len(result.GetOutputSymlinks())))
-		b.WriteString(fmt.Sprintf("- Stdout: %s\n", outputSummary(len(result.GetStdoutRaw()), result.GetStdoutDigest())))
-		b.WriteString(fmt.Sprintf("- Stderr: %s\n", outputSummary(len(result.GetStderrRaw()), result.GetStderrDigest())))
+		io.WriteString(w, "\n")
+		io.WriteString(w, "# Result details\n")
+		fmt.Fprintf(w, "- Exit code: %d\n", result.GetExitCode())
+		fmt.Fprintf(w, "- Outputs: %d files, %d directories, %d symlinks\n", len(result.GetOutputFiles()), len(result.GetOutputDirectories()), len(result.GetOutputSymlinks()))
+		fmt.Fprintf(w, "- Stdout: %s\n", outputSummary(len(result.GetStdoutRaw()), result.GetStdoutDigest()))
+		fmt.Fprintf(w, "- Stderr: %s\n", outputSummary(len(result.GetStderrRaw()), result.GetStderrDigest()))
 
 		if len(executeResponse.GetServerLogs()) > 0 {
-			b.WriteString("- Server logs:\n")
+			io.WriteString(w, "- Server logs:\n")
 			logNames := make([]string, 0, len(executeResponse.GetServerLogs()))
 			for name := range executeResponse.GetServerLogs() {
 				logNames = append(logNames, name)
@@ -243,7 +245,7 @@ func RenderMarkdownWithDetails(executionID string, executeResponse *repb.Execute
 			slices.Sort(logNames)
 			for _, name := range logNames {
 				logFile := executeResponse.GetServerLogs()[name]
-				b.WriteString(fmt.Sprintf("  - %s: %s\n", name, digestString(logFile.GetDigest())))
+				fmt.Fprintf(w, "  - %s: %s\n", name, digestString(logFile.GetDigest()))
 			}
 		}
 
@@ -255,35 +257,32 @@ func RenderMarkdownWithDetails(executionID string, executeResponse *repb.Execute
 				workerQueuedTS = formatTimestamp(aux.GetWorkerQueuedTimestamp())
 			}
 
-			b.WriteString("\n")
-			b.WriteString(colorHeading("# Execution metadata\n"))
-			b.WriteString(fmt.Sprintf("- Worker: %s\n", emptyIfUnset(md.GetWorker())))
-			b.WriteString(fmt.Sprintf("- Executor ID: %s\n", emptyIfUnset(md.GetExecutorId())))
-			b.WriteString(fmt.Sprintf("- Queued: %s\n", formatTimestamp(md.GetQueuedTimestamp())))
-			b.WriteString(fmt.Sprintf("- Worker queued: %s\n", workerQueuedTS))
-			b.WriteString(fmt.Sprintf("- Worker started: %s\n", formatTimestamp(md.GetWorkerStartTimestamp())))
-			b.WriteString(fmt.Sprintf("- Worker completed: %s\n", formatTimestamp(md.GetWorkerCompletedTimestamp())))
-			b.WriteString(fmt.Sprintf("- Input fetch duration: %s\n", formatDuration(md.GetInputFetchStartTimestamp(), md.GetInputFetchCompletedTimestamp())))
-			b.WriteString(fmt.Sprintf("- Execution duration: %s\n", formatDuration(md.GetExecutionStartTimestamp(), md.GetExecutionCompletedTimestamp())))
-			b.WriteString(fmt.Sprintf("- Output upload duration: %s\n", formatDuration(md.GetOutputUploadStartTimestamp(), md.GetOutputUploadCompletedTimestamp())))
-			b.WriteString(fmt.Sprintf("- Worker total duration: %s\n", formatDuration(md.GetWorkerStartTimestamp(), md.GetWorkerCompletedTimestamp())))
+			io.WriteString(w, "\n")
+			io.WriteString(w, "# Execution metadata\n")
+			fmt.Fprintf(w, "- Worker: %s\n", emptyIfUnset(md.GetWorker()))
+			fmt.Fprintf(w, "- Executor ID: %s\n", emptyIfUnset(md.GetExecutorId()))
+			fmt.Fprintf(w, "- Queued: %s\n", formatTimestamp(md.GetQueuedTimestamp()))
+			fmt.Fprintf(w, "- Worker queued: %s\n", workerQueuedTS)
+			fmt.Fprintf(w, "- Worker started: %s\n", formatTimestamp(md.GetWorkerStartTimestamp()))
+			fmt.Fprintf(w, "- Worker completed: %s\n", formatTimestamp(md.GetWorkerCompletedTimestamp()))
+			fmt.Fprintf(w, "- Input fetch duration: %s\n", formatDuration(md.GetInputFetchStartTimestamp(), md.GetInputFetchCompletedTimestamp()))
+			fmt.Fprintf(w, "- Execution duration: %s\n", formatDuration(md.GetExecutionStartTimestamp(), md.GetExecutionCompletedTimestamp()))
+			fmt.Fprintf(w, "- Output upload duration: %s\n", formatDuration(md.GetOutputUploadStartTimestamp(), md.GetOutputUploadCompletedTimestamp()))
+			fmt.Fprintf(w, "- Worker total duration: %s\n", formatDuration(md.GetWorkerStartTimestamp(), md.GetWorkerCompletedTimestamp()))
 		}
 	}
 
-	b.WriteString("\n")
-	b.WriteString(colorHeading("# Execution stdout\n"))
-	b.WriteString(renderTextSection(stdout))
-	b.WriteString("\n")
-	b.WriteString(colorHeading("# Execution stderr\n"))
-	b.WriteString(renderTextSection(stderr))
-	b.WriteString("\n")
-	b.WriteString(colorHeading("# Execution server logs\n"))
-	b.WriteString(renderServerLogsSection(executeResponse, details))
-	return b.String()
-}
+	io.WriteString(w, "\n")
+	io.WriteString(w, "# Execution stdout\n")
+	writeTextSection(w, stdout)
+	io.WriteString(w, "\n")
+	io.WriteString(w, "# Execution stderr\n")
+	writeTextSection(w, stderr)
+	io.WriteString(w, "\n")
+	io.WriteString(w, "# Execution server logs\n")
+	writeServerLogsSection(w, executeResponse, details)
 
-func colorHeading(s string) string {
-	return terminal.Esc(1, 36) + s + terminal.Esc()
+	return writerErr(w)
 }
 
 func colorForStatus(code codes.Code) string {
@@ -342,22 +341,24 @@ func formatDuration(start, end *timestamppb.Timestamp) string {
 	return d.String()
 }
 
-func renderTextSection(data []byte) string {
+func writeTextSection(w io.Writer, data []byte) {
 	if len(data) == 0 {
-		return "(Empty)\n"
+		io.WriteString(w, "(Empty)\n")
+		return
 	}
 	if !utf8.Valid(data) {
-		return fmt.Sprintf("<binary: %d bytes>\n", len(data))
+		fmt.Fprintf(w, "<binary: %d bytes>\n", len(data))
+		return
 	}
-	out := "```\n" + string(data)
+	io.WriteString(w, "```\n")
+	w.Write(data)
 	if data[len(data)-1] != '\n' {
-		out += "\n"
+		io.WriteString(w, "\n")
 	}
-	out += "```\n"
-	return out
+	io.WriteString(w, "```\n")
 }
 
-func renderServerLogsSection(executeResponse *repb.ExecuteResponse, details *rexec.ExecutionLogs) string {
+func writeServerLogsSection(w io.Writer, executeResponse *repb.ExecuteResponse, details *rexec.ExecutionLogs) {
 	if details != nil && len(details.ServerLogs) > 0 {
 		logNames := make([]string, 0, len(details.ServerLogs))
 		for name := range details.ServerLogs {
@@ -365,19 +366,19 @@ func renderServerLogsSection(executeResponse *repb.ExecuteResponse, details *rex
 		}
 		slices.Sort(logNames)
 
-		var b strings.Builder
 		for i, name := range logNames {
 			if i > 0 {
-				b.WriteString("\n")
+				io.WriteString(w, "\n")
 			}
-			b.WriteString(colorHeading(fmt.Sprintf("## %s\n", name)))
-			b.WriteString(renderTextSection(details.ServerLogs[name]))
+			fmt.Fprintf(w, "## %s\n", name)
+			writeTextSection(w, details.ServerLogs[name])
 		}
-		return b.String()
+		return
 	}
 
 	if len(executeResponse.GetServerLogs()) == 0 {
-		return "(Empty)\n"
+		io.WriteString(w, "(Empty)\n")
+		return
 	}
 
 	// Server logs exist but were not fetched in this code path.
@@ -386,10 +387,15 @@ func renderServerLogsSection(executeResponse *repb.ExecuteResponse, details *rex
 		logNames = append(logNames, name)
 	}
 	slices.Sort(logNames)
-	var b strings.Builder
 	for _, name := range logNames {
 		logFile := executeResponse.GetServerLogs()[name]
-		b.WriteString(fmt.Sprintf("- %s: %s\n", name, digestString(logFile.GetDigest())))
+		fmt.Fprintf(w, "- %s: %s\n", name, digestString(logFile.GetDigest()))
 	}
-	return b.String()
+}
+
+func writerErr(w io.Writer) error {
+	if w, ok := w.(interface{ Err() error }); ok {
+		return w.Err()
+	}
+	return nil
 }

@@ -28,7 +28,6 @@ go_test(
     deps = [
         ":rexec",
         "//proto:remote_execution_go_proto",
-        "//server/remote_cache/digest",
         "//server/util/proto",
         "@com_github_google_go_cmp//cmp",
         "@com_github_stretchr_testify//require",

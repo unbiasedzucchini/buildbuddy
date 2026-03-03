@@ -11,6 +11,7 @@ go_library(
         "//cli/executions",
         "//cli/log",
         "//cli/login",
+        "//cli/markdown",
         "//proto:remote_execution_go_proto",
         "//server/real_environment",
         "//server/remote_cache/digest",

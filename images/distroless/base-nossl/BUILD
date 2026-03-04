@@ -57,7 +57,7 @@ image_index(
 # Load a multi-platform image
 image_load(
     name = "load",
-    daemon = "docker",  # Explicitly use docker
+    daemon = "containerd",  # Explicitly use containerd
     image = ":index",  # References an image_index
     tag = "bb-distroless_base-nossl:latest",
 )

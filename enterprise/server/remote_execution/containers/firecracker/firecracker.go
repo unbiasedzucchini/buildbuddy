@@ -204,7 +204,7 @@ const (
 
 	// https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/networking_guide/sec-configuring_ip_networking_from_the_kernel_command_line
 	// ip<client-IP-number>:[<server-id>]:<gateway-IP-number>:<netmask>:<client-hostname>:<interface>:{dhcp|dhcp6|auto6|on|any|none|off}
-	machineIPBootArgs = "ip=" + vmIP + ":::255.255.255.48::" + vmIface + ":off"
+	machineIPBootArgs = "ip=" + vmIP + ":::255.255.255.248::" + vmIface + ":off"
 
 	// This is pretty arbitrary limit -- when vmIdx gets this big it will
 	// roll over to 0, causing new VMs to start re-using old local IPs. But
@@ -1620,7 +1620,6 @@ func getBootArgs(vmConfig *fcpb.VMConfiguration) string {
 		"i8042.nopnp",
 		"i8042.dumbkbd",
 		"tsc=reliable",
-		"ipv6.disable=1",
 	}
 	if networkingEnabled(vmConfig.NetworkMode) {
 		kernelArgs = append(kernelArgs, machineIPBootArgs)

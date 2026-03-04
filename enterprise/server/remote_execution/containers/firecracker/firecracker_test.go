@@ -78,6 +78,7 @@ const (
 	ubuntuImage                 = "mirror.gcr.io/library/ubuntu:20.04"
 	imageWithDockerInstalled    = "gcr.io/flame-public/executor-docker-default:enterprise-v1.6.0"
 	imageWithDockerV28Installed = platform.Ubuntu24_04Image
+	dockerDindImage             = "docker:dind"
 
 	// Minimum memory needed for a firecracker VM. This may need to be increased
 	// if the size of initrd.cpio increases.
@@ -2456,6 +2457,65 @@ func TestFirecrackerRunNOPWithZeroDisk(t *testing.T) {
 	assert.Equal(t, "/workspace\n", string(res.Stdout))
 }
 
+func TestFirecrackerRunWithIPv6Enabled(t *testing.T) {
+	ctx := context.Background()
+	env := getTestEnv(ctx, t, envOpts{})
+	rootDir := testfs.MakeTempDir(t)
+	workDir := testfs.MakeDirAll(t, rootDir, "work")
+	cmd := &repb.Command{
+		Arguments: []string{"sh", "-c", `
+			set -e
+
+			# IPv4 should be available with external networking.
+			if [ ! -r /proc/sys/net/ipv4/ip_forward ]; then
+				echo "missing /proc/sys/net/ipv4/ip_forward" >&2
+				exit 1
+			fi
+			if ! grep -Eq '^[[:space:]]*eth0:' /proc/net/dev; then
+				echo "expected eth0 device; got:" >&2
+				cat /proc/net/dev >&2
+				exit 1
+			fi
+
+			# IPv6 should also be enabled.
+			if grep -q 'ipv6.disable=1' /proc/cmdline; then
+				echo "kernel cmdline has ipv6.disable=1: $(cat /proc/cmdline)" >&2
+				exit 1
+			fi
+			if [ "$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6)" != "0" ] || [ "$(cat /proc/sys/net/ipv6/conf/default/disable_ipv6)" != "0" ]; then
+				echo "IPv6 disable flags: all=$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6) default=$(cat /proc/sys/net/ipv6/conf/default/disable_ipv6)" >&2
+				exit 1
+			fi
+			if ! grep -q . /proc/net/if_inet6; then
+				echo "expected non-empty /proc/net/if_inet6" >&2
+				cat /proc/net/if_inet6 >&2 || true
+				exit 1
+			fi
+			echo ipv4_ipv6_enabled
+		`},
+	}
+	opts := firecracker.ContainerOpts{
+		ContainerImage:         busyboxImage,
+		ActionWorkingDirectory: workDir,
+		VMConfiguration: &fcpb.VMConfiguration{
+			NumCpus:           1,
+			MemSizeMb:         2500,
+			NetworkMode:       fcpb.NetworkMode_NETWORK_MODE_EXTERNAL,
+			ScratchDiskSizeMb: 100,
+		},
+		ExecutorConfig: getExecutorConfig(t),
+	}
+	c, err := firecracker.NewContainer(ctx, env, &repb.ExecutionTask{}, opts)
+	require.NoError(t, err)
+
+	// Run will handle the full lifecycle: no need to call Remove() here.
+	res := c.Run(ctx, cmd, opts.ActionWorkingDirectory, oci.Credentials{})
+	require.NoError(t, res.Error)
+	assert.Equal(t, 0, res.ExitCode)
+	assert.Equal(t, "", string(res.Stderr))
+	assert.Equal(t, "ipv4_ipv6_enabled\n", string(res.Stdout))
+}
+
 func testFirecrackerRunWithDockerOverUDS(t *testing.T, containerImage string) {
 	if *skipDockerTests {
 		t.Skip()
@@ -2466,11 +2526,11 @@ func testFirecrackerRunWithDockerOverUDS(t *testing.T, containerImage string) {
 	rootDir := testfs.MakeTempDir(t)
 	workDir := testfs.MakeDirAll(t, rootDir, "work")
 	cmd := &repb.Command{
-		Arguments: []string{"bash", "-c", `
+		Arguments: []string{"sh", "-c", `
 			set -e
 
 			# Discard pull output to make the output deterministic
-			docker pull ` + busyboxImage + ` &>/dev/null
+			docker pull ` + busyboxImage + ` >/dev/null 2>&1
 
 			# Try running a few commands
 			docker run --rm -p 127.0.0.1:18080:80 ` + busyboxImage + ` echo Hello
@@ -2519,6 +2579,70 @@ func TestFirecrackerRunWithDockerOverUDS(t *testing.T) {
 
 func TestFirecrackerRunWithDockerV28OverUDS(t *testing.T) {
 	testFirecrackerRunWithDockerOverUDS(t, imageWithDockerV28Installed)
+}
+
+func TestFirecrackerRunWithDockerDindOverUDS(t *testing.T) {
+	if *skipDockerTests {
+		t.Skip()
+	}
+
+	ctx := context.Background()
+	env := getTestEnv(ctx, t, envOpts{})
+	rootDir := testfs.MakeTempDir(t)
+	workDir := testfs.MakeDirAll(t, rootDir, "work")
+	cmd := &repb.Command{
+		Arguments: []string{"sh", "-c", `
+			set -e
+
+			log_path="$PWD/dockerd.log"
+			rm -f "$log_path"
+			DOCKER_INSECURE_NO_IPTABLES_RAW=1 dockerd \
+				--host=unix:///var/run/docker.sock \
+				--iptables=false \
+				--storage-driver=vfs \
+				>"$log_path" 2>&1 &
+
+			i=0
+			until docker ps >/dev/null 2>&1; do
+				i=$((i + 1))
+				if [ "$i" -ge 180 ]; then
+					echo "dockerd did not become ready in time" >&2
+					cat "$log_path" >&2 || true
+					exit 1
+				fi
+				sleep 1
+			done
+
+			# Discard pull output to make the output deterministic
+			docker pull ` + busyboxImage + ` >/dev/null 2>&1
+
+			# Try running a few commands
+			docker run --rm ` + busyboxImage + ` echo Hello
+			docker run --rm ` + busyboxImage + ` echo world
+		`},
+	}
+
+	opts := firecracker.ContainerOpts{
+		ContainerImage:         dockerDindImage,
+		ActionWorkingDirectory: workDir,
+		VMConfiguration: &fcpb.VMConfiguration{
+			NumCpus:           1,
+			MemSizeMb:         2500,
+			NetworkMode:       fcpb.NetworkMode_NETWORK_MODE_EXTERNAL,
+			ScratchDiskSizeMb: 100,
+		},
+		ExecutorConfig: getExecutorConfig(t),
+	}
+	c, err := firecracker.NewContainer(ctx, env, &repb.ExecutionTask{}, opts)
+	require.NoError(t, err)
+
+	// Run will handle the full lifecycle: no need to call Remove() here.
+	res := c.Run(ctx, cmd, opts.ActionWorkingDirectory, oci.Credentials{})
+	require.NoError(t, res.Error)
+
+	assert.Equal(t, 0, res.ExitCode)
+	assert.Equal(t, "Hello\nworld\n", string(res.Stdout), "stdout should contain docker output")
+	assert.Equal(t, "", string(res.Stderr), "stderr should be empty")
 }
 
 func TestFirecrackerRunWithDockerOverTCP(t *testing.T) {

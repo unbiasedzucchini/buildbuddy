@@ -116,6 +116,18 @@ genrule(
 # bazel test --config=remote --test_tag_filters=+bare \
 # //enterprise/server/remote_execution/containers/firecracker:firecracker_test
 go_test(
+    name = "firecracker_bootargs_test",
+    srcs = ["firecracker_bootargs_test.go"],
+    embed = [":firecracker"],
+    target_compatible_with = [
+        "@platforms//os:linux",
+    ],
+    deps = [
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_test(
     name = "firecracker_test",
     timeout = "long",
     srcs = ["firecracker_test.go"],

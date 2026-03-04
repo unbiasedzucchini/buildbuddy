@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	dockerdInitTimeout       = 30 * time.Second
+	dockerdInitTimeout       = 90 * time.Second
 	dockerdDefaultSocketPath = "/var/run/docker.sock"
 
 	vmDNSInitTimeout = 5 * time.Second
@@ -129,6 +129,7 @@ func Run(ctx context.Context, port uint32, workspaceDevice string, initDockerd b
 func waitForDockerd(ctx context.Context, enableDockerdTCP bool) error {
 	ctx, cancel := context.WithTimeout(ctx, dockerdInitTimeout)
 	defer cancel()
+	var lastErr error
 	r := retry.New(ctx, &retry.Options{
 		InitialBackoff: 10 * time.Microsecond,
 		MaxBackoff:     100 * time.Millisecond,
@@ -146,6 +147,10 @@ func waitForDockerd(ctx context.Context, enableDockerdTCP bool) error {
 			log.Infof("dockerd is ready")
 			return nil
 		}
+		lastErr = err
+	}
+	if lastErr != nil {
+		return status.DeadlineExceededErrorf("docker init timed out after %s: last error: %s", dockerdInitTimeout, lastErr)
 	}
 	return status.DeadlineExceededErrorf("docker init timed out after %s", dockerdInitTimeout)
 }

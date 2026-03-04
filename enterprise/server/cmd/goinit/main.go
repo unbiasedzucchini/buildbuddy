@@ -168,6 +168,21 @@ func copyFile(src, dest string, mode os.FileMode) error {
 	return nil
 }
 
+// Ensure IPv6 is enabled in the guest regardless of image defaults.
+func enableIPv6() error {
+	paths := []string{
+		"/proc/sys/net/ipv6/conf/all/disable_ipv6",
+		"/proc/sys/net/ipv6/conf/default/disable_ipv6",
+		"/proc/sys/net/ipv6/conf/lo/disable_ipv6",
+	}
+	for _, path := range paths {
+		if err := os.WriteFile(path, []byte("0"), 0644); err != nil {
+			return status.InternalErrorf("enable ipv6 at %q: %s", path, err)
+		}
+	}
+	return nil
+}
+
 func startDockerd(ctx context.Context) error {
 	// Make sure we can locate both docker and dockerd.
 	if _, err := exec.LookPath("docker"); err != nil {
@@ -317,6 +332,7 @@ func main() {
 	die(mkdirp("/proc", 0555))
 	die(mount("proc", "/proc", "proc", commonMountFlags, ""))
 	die(mount("binfmt_misc", "/proc/sys/fs/binfmt_misc", "binfmt_misc", commonMountFlags|syscall.MS_RELATIME, ""))
+	die(enableIPv6())
 
 	die(mkdirp("/sys", 0555))
 	die(mount("sys", "/sys", "sysfs", commonMountFlags, ""))

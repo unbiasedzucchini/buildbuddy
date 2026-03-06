@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/buildbuddy-io/buildbuddy/server/environment"
 	"github.com/buildbuddy-io/buildbuddy/server/interfaces"
@@ -16,11 +17,13 @@ import (
 	"github.com/buildbuddy-io/buildbuddy/server/resources"
 	"github.com/buildbuddy-io/buildbuddy/server/util/authutil"
 	"github.com/buildbuddy-io/buildbuddy/server/util/bytebufferpool"
+	"github.com/buildbuddy-io/buildbuddy/server/util/flag"
 	"github.com/buildbuddy-io/buildbuddy/server/util/grpc_client"
 	"github.com/buildbuddy-io/buildbuddy/server/util/grpc_server"
 	"github.com/buildbuddy-io/buildbuddy/server/util/ioutil"
 	"github.com/buildbuddy-io/buildbuddy/server/util/log"
 	"github.com/buildbuddy-io/buildbuddy/server/util/prefix"
+	"github.com/buildbuddy-io/buildbuddy/server/util/rpcutil"
 	"github.com/buildbuddy-io/buildbuddy/server/util/status"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -42,6 +45,8 @@ const (
 	// overhead.
 	writeBufSizeBytes = 512 * 1000 // 512 KB
 )
+
+var peerWriteTimeout = flag.Duration("cache.distributed_cache.peer_write_timeout", time.Minute, "Maximum time to wait for a single distributed cache peer write send or close operation before treating the peer as stalled.")
 
 type Proxy struct {
 	env                   environment.Env
@@ -615,12 +620,38 @@ func (r *distributedCacheReader) Close() error {
 type streamWriteCloser struct {
 	cancelFunc         context.CancelFunc
 	stream             dcpb.DistributedCache_WriteClient
+	sender             rpcutil.Sender[*dcpb.WriteRequest, *dcpb.WriteResponse]
+	peer               string
 	r                  *rspb.ResourceName
 	key                *dcpb.Key
 	isolation          *dcpb.Isolation
 	handoffPeer        string
 	alreadyExists      bool
 	closeAndRecvCalled bool
+}
+
+func (wc *streamWriteCloser) sendTimeoutCause() error {
+	return status.DeadlineExceededErrorf("timed out sending distributed cache write to peer %q for %s", wc.peer, ResourceIsolationString(wc.r))
+}
+
+func (wc *streamWriteCloser) closeTimeoutCause() error {
+	return status.DeadlineExceededErrorf("timed out finalizing distributed cache write to peer %q for %s", wc.peer, ResourceIsolationString(wc.r))
+}
+
+func (wc *streamWriteCloser) send(req *dcpb.WriteRequest) error {
+	err := wc.sender.SendWithTimeoutCause(req, *peerWriteTimeout, wc.sendTimeoutCause())
+	if status.IsDeadlineExceededError(err) {
+		wc.cancelFunc()
+	}
+	return err
+}
+
+func (wc *streamWriteCloser) closeAndRecv() (*dcpb.WriteResponse, error) {
+	rsp, err := wc.sender.CloseAndRecvWithTimeoutCause(*peerWriteTimeout, wc.closeTimeoutCause())
+	if status.IsDeadlineExceededError(err) {
+		wc.cancelFunc()
+	}
+	return rsp, err
 }
 
 func (wc *streamWriteCloser) Write(data []byte) (int, error) {
@@ -636,9 +667,9 @@ func (wc *streamWriteCloser) Write(data []byte) (int, error) {
 		HandoffPeer:        wc.handoffPeer,
 		Resource:           wc.r,
 	}
-	err := wc.stream.Send(req)
+	err := wc.send(req)
 	if err == io.EOF {
-		_, streamErr := wc.stream.CloseAndRecv()
+		_, streamErr := wc.closeAndRecv()
 		wc.closeAndRecvCalled = true
 		if status.IsAlreadyExistsError(streamErr) {
 			wc.alreadyExists = true
@@ -665,11 +696,11 @@ func (wc *streamWriteCloser) Commit() error {
 		HandoffPeer:        wc.handoffPeer,
 		Resource:           wc.r,
 	}
-	sendErr := wc.stream.Send(req)
+	sendErr := wc.send(req)
 	if sendErr != nil && sendErr != io.EOF {
 		return sendErr
 	}
-	_, err := wc.stream.CloseAndRecv()
+	_, err := wc.closeAndRecv()
 	wc.closeAndRecvCalled = true
 	if status.IsAlreadyExistsError(err) {
 		return nil
@@ -683,7 +714,7 @@ func (wc *streamWriteCloser) Commit() error {
 func (wc *streamWriteCloser) Close() error {
 	wc.cancelFunc()
 	if !wc.closeAndRecvCalled {
-		_, err := wc.stream.CloseAndRecv()
+		_, err := wc.closeAndRecv()
 		return err
 	}
 	return nil
@@ -709,6 +740,8 @@ func (c *Proxy) RemoteWriter(ctx context.Context, peer, handoffPeer string, r *r
 
 	wc := &streamWriteCloser{
 		cancelFunc:  cancel,
+		sender:      rpcutil.NewSender[*dcpb.WriteRequest, *dcpb.WriteResponse](ctx, stream),
+		peer:        peer,
 		isolation:   isolation,
 		handoffPeer: handoffPeer,
 		key:         digestToKey(r.GetDigest()),

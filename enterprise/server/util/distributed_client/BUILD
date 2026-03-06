@@ -18,11 +18,13 @@ go_library(
         "//server/resources",
         "//server/util/authutil",
         "//server/util/bytebufferpool",
+        "//server/util/flag",
         "//server/util/grpc_client",
         "//server/util/grpc_server",
         "//server/util/ioutil",
         "//server/util/log",
         "//server/util/prefix",
+        "//server/util/rpcutil",
         "//server/util/status",
         "@org_golang_google_grpc//:grpc",
         "@org_golang_google_grpc//metadata",
@@ -53,5 +55,20 @@ go_test(
         "@com_github_google_go_cmp//cmp",
         "@com_github_stretchr_testify//require",
         "@org_golang_google_protobuf//testing/protocmp",
+    ],
+)
+
+go_test(
+    name = "distributed_client_internal_test",
+    srcs = ["distributed_test.go"],
+    embed = [":distributed_client"],
+    deps = [
+        "//proto:distributed_cache_go_proto",
+        "//proto:remote_execution_go_proto",
+        "//proto:resource_go_proto",
+        "//server/util/status",
+        "//server/util/testing/flags",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_grpc//metadata",
     ],
 )

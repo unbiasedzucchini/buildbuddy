@@ -28,9 +28,31 @@ tramp
 # Bazel directories
 /bazel-*
 
-# Generated protos (except pre-generated ones in proto/invocation/)
+# Generated protos (except pre-generated ones checked into proto/<pkg>/ dirs)
 **/proto/**/*.pb.go
+!proto/acl/*.pb.go
+!proto/action_cache/*.pb.go
+!proto/api/v1/common/*.pb.go
+!proto/build_event_stream/*.pb.go
+!proto/cache/*.pb.go
+!proto/capability/*.pb.go
+!proto/command_line/*.pb.go
+!proto/context/*.pb.go
+!proto/failure_details/*.pb.go
 !proto/invocation/*.pb.go
+!proto/invocation_policy/*.pb.go
+!proto/invocation_status/*.pb.go
+!proto/option_filters/*.pb.go
+!proto/package_load_metrics/*.pb.go
+!proto/remote_execution/*.pb.go
+!proto/resource/*.pb.go
+!proto/scheduler/*.pb.go
+!proto/semver/*.pb.go
+!proto/stat_filter/*.pb.go
+!proto/strategy_policy/*.pb.go
+!proto/target/*.pb.go
+!proto/trace/*.pb.go
+!proto/user_id/*.pb.go
 **/proto/**/*_ts_proto.d.ts
 **/proto/**/*_ts_proto.js
 

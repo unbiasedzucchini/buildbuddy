@@ -2,6 +2,8 @@ load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load("//proto:defs.bzl", "ts_proto_library")
 
+exports_files(["common.proto"])
+
 proto_library(
     name = "common_proto",
     srcs = [

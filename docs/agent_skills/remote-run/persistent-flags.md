@@ -1,1 +1,0 @@
-- `--test_output=errors`: Example: `bb remote test :target --test_output=errors`

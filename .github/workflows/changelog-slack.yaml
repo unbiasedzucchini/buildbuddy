@@ -1,0 +1,73 @@
+name: Changelog Slack Notify
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "website/changelog/*.md"
+      - "website/changelog/*.mdx"
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Collect newly added changelog files
+        id: files
+        shell: bash
+        run: |
+          BEFORE_SHA="${{ github.event.before }}"
+          if [[ "$BEFORE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+            BEFORE_SHA=$(git rev-list --max-parents=0 HEAD)
+          fi
+
+          added=$(
+            git diff --name-status "$BEFORE_SHA" "${{ github.sha }}" -- "website/changelog/*.md" "website/changelog/*.mdx" \
+              | awk '$1 == "A" {print $2}'
+          )
+
+          {
+            echo "added<<EOF"
+            echo "$added"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build Slack message
+        id: message
+        if: steps.files.outputs.added != ''
+        shell: bash
+        run: |
+          msg="*New changelog entries added:*\n"
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            slug="$(basename "$file")"
+            slug="${slug%.*}"
+            msg="${msg}• https://www.buildbuddy.io/changelog/${slug}\n"
+          done <<< "${{ steps.files.outputs.added }}"
+
+          {
+            echo "text<<EOF"
+            echo -e "$msg"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post to Slack
+        if: steps.message.outputs.text != ''
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              attachments: [{
+                color: '#1f883d',
+                text: `${{ steps.message.outputs.text }}`
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_CHANGELOG_WEBHOOK_URL }}

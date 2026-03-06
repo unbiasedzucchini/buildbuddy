@@ -34,6 +34,18 @@ type blockingSendStream[T any] struct {
 	sendReturned chan struct{}
 }
 
+func (s *blockingSendStream[T]) Send(T) error {
+	close(s.sendStarted)
+	<-s.ctx.Done()
+	close(s.sendReturned)
+	return s.ctx.Err()
+}
+
+func (s *blockingSendStream[T]) CloseAndRecv() (T, error) {
+	var zero T
+	return zero, nil
+}
+
 func (s *stream[T]) Recv() (T, error) {
 	var zero T
 	msg, ok := <-s.ch
@@ -53,18 +65,6 @@ func (s *stream[T]) CloseAndRecv() (T, error) {
 		msg := <-s.closeRecvCh
 		return msg.Val, msg.Err
 	}
-	var zero T
-	return zero, nil
-}
-
-func (s *blockingSendStream[T]) Send(T) error {
-	close(s.sendStarted)
-	<-s.ctx.Done()
-	close(s.sendReturned)
-	return s.ctx.Err()
-}
-
-func (s *blockingSendStream[T]) CloseAndRecv() (T, error) {
 	var zero T
 	return zero, nil
 }
@@ -129,7 +129,7 @@ func TestCloseAndRecv(t *testing.T) {
 }
 
 func TestSender_SendTimeoutDoesNotLeakAfterCancel(t *testing.T) {
-	const iterations = 25
+	const iterations = 100
 	baseline := runtime.NumGoroutine()
 
 	for i := 0; i < iterations; i++ {

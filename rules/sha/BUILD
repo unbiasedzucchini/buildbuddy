@@ -1,11 +1,2 @@
 load(":index.bzl", "sha")
 
-sha(
-    name = "testdata_sha",
-    srcs = [
-        # Include a generated file to test config dir normalization.
-        "//rules/sha/testdata:generated_file.txt",
-        # Include a dir symlink to test that 'find' is following symlinks.
-        "//rules/sha/testdata:dir.ln",
-    ],
-)

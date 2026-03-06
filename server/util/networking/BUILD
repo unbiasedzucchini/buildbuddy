@@ -1,5 +1,4 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
-load("//dockerfiles/test_images:defs.bzl", "NET_TOOLS_IMAGE")
 
 go_library(
     name = "networking",

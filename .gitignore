@@ -28,8 +28,9 @@ tramp
 # Bazel directories
 /bazel-*
 
-# Generated protos
+# Generated protos (except pre-generated ones in proto/invocation/)
 **/proto/**/*.pb.go
+!proto/invocation/*.pb.go
 **/proto/**/*_ts_proto.d.ts
 **/proto/**/*_ts_proto.js
 

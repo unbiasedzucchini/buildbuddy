@@ -6,7 +6,7 @@ go_library(
     importpath = "github.com/buildbuddy-io/buildbuddy/server/build_event_protocol/invocation_format",
     visibility = ["//visibility:public"],
     deps = [
-        "//proto:invocation_go_proto",
+        "//proto/invocation",
         "//server/util/status",
     ],
 )

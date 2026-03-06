@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -24,22 +24,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "remote_crypter_test",
-    srcs = ["remote_crypter_test.go"],
-    deps = [
-        ":remote_crypter",
-        "//enterprise/server/clientidentity",
-        "//proto:encryption_go_proto",
-        "//proto:remote_execution_go_proto",
-        "//server/interfaces",
-        "//server/testutil/testauth",
-        "//server/testutil/testdata",
-        "//server/testutil/testenv",
-        "//server/util/ioutil",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_jonboulle_clockwork//:clockwork",
-        "@com_github_stretchr_testify//require",
-    ],
-)

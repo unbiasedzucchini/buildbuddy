@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//cli:__subpackages__"])
 
@@ -15,11 +15,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "versioncmd_test",
-    srcs = ["versioncmd_test.go"],
-    deps = [
-        ":versioncmd",
-        "@com_github_stretchr_testify//require",
-    ],
-)

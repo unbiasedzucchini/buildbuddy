@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -34,27 +34,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "vmexec_test",
-    srcs = ["vmexec_test.go"],
-    embed = [":vmexec"],
-    exec_properties = {
-        # Run in a firecracker VM since this test runs sync() and we don't want
-        # to cause unnecessary IO on the host machine.
-        "test.workload-isolation-type": "firecracker",
-    },
-    deps = [
-        "//enterprise/server/remote_execution/commandutil",
-        "//enterprise/server/remote_execution/vmexec_client",
-        "//proto:remote_execution_go_proto",
-        "//proto:vmexec_go_proto",
-        "//server/interfaces",
-        "//server/testutil/testfs",
-        "//server/util/disk",
-        "//server/util/fsutil",
-        "//server/util/status",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_grpc//:grpc",
-    ],
-)

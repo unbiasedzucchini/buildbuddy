@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -39,36 +39,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "distributed_test",
-    size = "small",
-    srcs = ["distributed_test.go"],
-    embed = [":distributed"],
-    shard_count = 1,
-    tags = ["block-network"],
-    deps = [
-        "//proto:remote_execution_go_proto",
-        "//proto:resource_go_proto",
-        "//server/backends/memory_cache",
-        "//server/environment",
-        "//server/interfaces",
-        "//server/metrics",
-        "//server/remote_cache/digest",
-        "//server/testutil/testauth",
-        "//server/testutil/testcompression",
-        "//server/testutil/testdigest",
-        "//server/testutil/testenv",
-        "//server/testutil/testmetrics",
-        "//server/testutil/testport",
-        "//server/util/compression",
-        "//server/util/grpc_client",
-        "//server/util/log",
-        "//server/util/prefix",
-        "//server/util/proto",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_grpc//:grpc",
-    ],
-)

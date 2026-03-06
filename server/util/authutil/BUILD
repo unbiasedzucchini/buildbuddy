@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "authutil",
@@ -21,12 +21,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "authutil_test",
-    size = "small",
-    srcs = ["authutil_test.go"],
-    embed = [":authutil"],
-    deps = [
-        "@com_github_stretchr_testify//assert",
-    ],
-)

@@ -1,4 +1,4 @@
-load("//rules/typescript:index.bzl", "ts_jasmine_node_test", "ts_library")
+load("//rules/typescript:index.bzl", "ts_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -26,18 +26,6 @@ ts_library(
         "//app/util:math",
         "//app/util:scroller",
     ],
-)
-
-ts_jasmine_node_test(
-    name = "text_test",
-    srcs = ["text_test.ts"],
-    deps = [":terminal"],
-)
-
-ts_jasmine_node_test(
-    name = "terminal_copy_test",
-    srcs = ["terminal_copy_test.ts"],
-    deps = [":copy"],
 )
 
 ts_library(

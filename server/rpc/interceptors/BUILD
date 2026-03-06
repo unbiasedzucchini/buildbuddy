@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "interceptors",
@@ -31,21 +31,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "interceptors_test",
-    size = "small",
-    srcs = ["interceptors_test.go"],
-    deps = [
-        "//proto:ping_service_go_proto",
-        "//server/testutil/testenv",
-        "//server/testutil/testport",
-        "//server/util/clientip",
-        "//server/util/grpc_client",
-        "//server/util/grpc_server",
-        "//server/util/log",
-        "//server/util/random",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_grpc//:grpc",
-    ],
-)

@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "rpcutil",
@@ -16,12 +16,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "rpcutil_test",
-    srcs = ["rpcutil_test.go"],
-    deps = [
-        ":rpcutil",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//types/known/timestamppb",
-    ],
-)

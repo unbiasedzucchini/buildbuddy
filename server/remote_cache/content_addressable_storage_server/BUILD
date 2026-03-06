@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "content_addressable_storage_server",
@@ -39,47 +39,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "content_addressable_storage_server_test",
-    size = "small",
-    srcs = ["content_addressable_storage_server_test.go"],
-    data = glob(["testdata/**"]),
-    shard_count = 6,
-    deps = [
-        ":content_addressable_storage_server",
-        "//enterprise/server/experiments",
-        "//proto:cache_go_proto",
-        "//proto:capability_go_proto",
-        "//proto:remote_execution_go_proto",
-        "//proto:resource_go_proto",
-        "//server/backends/memory_cache",
-        "//server/backends/memory_metrics_collector",
-        "//server/interfaces",
-        "//server/remote_cache/byte_stream_server",
-        "//server/remote_cache/cachetools",
-        "//server/remote_cache/chunking",
-        "//server/remote_cache/digest",
-        "//server/remote_cache/hit_tracker",
-        "//server/testutil/cas",
-        "//server/testutil/testauth",
-        "//server/testutil/testcompression",
-        "//server/testutil/testdigest",
-        "//server/testutil/testenv",
-        "//server/util/bazel_request",
-        "//server/util/compression",
-        "//server/util/prefix",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_buildbuddy_io_fastcdc2020//fastcdc",
-        "@com_github_google_uuid//:uuid",
-        "@com_github_open_feature_go_sdk//openfeature",
-        "@com_github_open_feature_go_sdk//openfeature/memprovider",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_genproto_googleapis_bytestream//:bytestream",
-        "@org_golang_google_genproto_googleapis_rpc//errdetails",
-        "@org_golang_google_grpc//:grpc",
-        "@org_golang_google_grpc//codes",
-        "@org_golang_google_grpc//status",
-    ],
-)

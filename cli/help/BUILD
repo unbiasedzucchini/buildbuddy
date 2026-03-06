@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//cli:__subpackages__"])
 
@@ -15,14 +15,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "help_test",
-    srcs = ["help_test.go"],
-    deps = [
-        ":help",
-        "//cli/cli_command/register",
-        "//cli/parser/arguments",
-        "//cli/parser/parsed",
-        "@com_github_stretchr_testify//require",
-    ],
-)

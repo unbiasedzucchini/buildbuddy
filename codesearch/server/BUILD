@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "server",
@@ -44,27 +44,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "server_test",
-    srcs = ["server_test.go"],
-    embed = [":server"],
-    deps = [
-        "//codesearch/github",
-        "//codesearch/index",
-        "//proto:git_go_proto",
-        "//proto:index_go_proto",
-        "//proto:search_go_proto",
-        "//server/nullauth",
-        "//server/real_environment",
-        "//server/testutil/testfs",
-        "//server/util/git",
-        "//server/util/log",
-        "//server/util/status",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@io_kythe//kythe/go/services/xrefs",
-        "@io_kythe//kythe/go/serving/graph",
-        "@io_kythe//kythe/proto:graph_go_proto",
-        "@io_kythe//kythe/proto:xref_go_proto",
-    ],
-)

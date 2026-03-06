@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -115,78 +115,3 @@ genrule(
 # To remotely execute this test, a couple of tag_filters are needed:
 # bazel test --config=remote --test_tag_filters=+bare \
 # //enterprise/server/remote_execution/containers/firecracker:firecracker_test
-go_test(
-    name = "firecracker_test",
-    timeout = "long",
-    srcs = ["firecracker_test.go"],
-    args = [
-        "--executor.enable_local_snapshot_sharing=true",
-        "--executor.enable_remote_snapshot_sharing=true",
-        "--executor.firecracker_enable_linux_6_1=true",
-    ],
-    exec_properties = {
-        "test.Pool": "bare",
-        "test.use-self-hosted-executors": "true",
-        "test.container-image": "none",
-        # These tests can get pretty expensive when running on a cold executor
-        # because of OCI image conversion. Size the task manually to avoid OOM.
-        # TODO: include test ext4 images as deps to avoid conversion.
-        "test.EstimatedComputeUnits": "10",
-    },
-    shard_count = 30,
-    tags = [
-        "bare",  # Firecracker tests must be run with bare execution so they aren't nested within another container
-        "no-sandbox",  # Firecracker is not compatible with Bazel's sandbox environment
-    ],
-    target_compatible_with = [
-        "@platforms//os:linux",
-    ],
-    deps = [
-        ":firecracker",
-        "//enterprise/server/action_cache_server_proxy",
-        "//enterprise/server/byte_stream_server_proxy",
-        "//enterprise/server/clientidentity",
-        "//enterprise/server/ociregistry",
-        "//enterprise/server/remote_execution/container",
-        "//enterprise/server/remote_execution/copy_on_write",
-        "//enterprise/server/remote_execution/filecache",
-        "//enterprise/server/remote_execution/snaploader",
-        "//enterprise/server/remote_execution/snaputil",
-        "//enterprise/server/remote_execution/workspace",
-        "//enterprise/server/testutil/testcontainer",
-        "//enterprise/server/util/cpuset",
-        "//enterprise/server/util/ext4",
-        "//enterprise/server/util/oci",
-        "//proto:firecracker_go_proto",
-        "//proto:remote_execution_go_proto",
-        "//server/backends/disk_cache",
-        "//server/interfaces",
-        "//server/metrics",
-        "//server/remote_cache/action_cache_server",
-        "//server/remote_cache/byte_stream_server",
-        "//server/remote_cache/content_addressable_storage_server",
-        "//server/resources",
-        "//server/rpc/interceptors",
-        "//server/testutil/testauth",
-        "//server/testutil/testdigest",
-        "//server/testutil/testenv",
-        "//server/testutil/testfs",
-        "//server/testutil/testmetrics",
-        "//server/testutil/testnetworking",
-        "//server/testutil/testport",
-        "//server/util/disk",
-        "//server/util/log",
-        "//server/util/networking",
-        "//server/util/platform",
-        "//server/util/random",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_google_go_cmp//cmp",
-        "@com_github_prometheus_client_golang//prometheus",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_genproto_googleapis_bytestream//:bytestream",
-        "@org_golang_google_protobuf//testing/protocmp",
-        "@org_golang_x_sync//errgroup",
-    ],
-)

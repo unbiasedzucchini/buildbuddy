@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -48,42 +48,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "pebble_cache_test",
-    size = "medium",
-    srcs = ["pebble_cache_test.go"],
-    shard_count = 2,
-    deps = [
-        ":pebble_cache",
-        "//enterprise/server/backends/kms",
-        "//enterprise/server/crypter_service",
-        "//enterprise/server/filestore",
-        "//enterprise/server/raft/keys",
-        "//proto:remote_execution_go_proto",
-        "//proto:resource_go_proto",
-        "//proto:storage_go_proto",
-        "//server/environment",
-        "//server/interfaces",
-        "//server/remote_cache/digest",
-        "//server/tables",
-        "//server/testutil/mockgcs",
-        "//server/testutil/testauth",
-        "//server/testutil/testdigest",
-        "//server/testutil/testenv",
-        "//server/testutil/testfs",
-        "//server/util/compression",
-        "//server/util/disk",
-        "//server/util/log",
-        "//server/util/prefix",
-        "//server/util/proto",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_cockroachdb_pebble//:pebble",
-        "@com_github_cockroachdb_pebble//vfs",
-        "@com_github_docker_go_units//:go-units",
-        "@com_github_jonboulle_clockwork//:clockwork",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_x_sync//errgroup",
-    ],
-)

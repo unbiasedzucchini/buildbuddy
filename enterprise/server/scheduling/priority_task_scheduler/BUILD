@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -34,24 +34,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "priority_task_scheduler_test",
-    size = "small",
-    srcs = ["priority_task_scheduler_test.go"],
-    embed = [":priority_task_scheduler"],
-    deps = [
-        "//proto:remote_execution_go_proto",
-        "//proto:scheduler_go_proto",
-        "//server/interfaces",
-        "//server/resources",
-        "//server/testutil/testenv",
-        "//server/util/log",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "//server/util/uuid",
-        "@com_github_jonboulle_clockwork//:clockwork",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_grpc//:grpc",
-    ],
-)

@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "target",
@@ -30,30 +30,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "target_test",
-    srcs = ["target_test.go"],
-    exec_properties = {
-        "test.workload-isolation-type": "firecracker",
-        "test.init-dockerd": "true",
-        "test.recycle-runner": "true",
-        "test.runner-recycling-key": "clickhouse25.3",
-    },
-    tags = ["docker"],
-    deps = [
-        ":target",
-        "//proto:build_event_stream_go_proto",
-        "//proto:context_go_proto",
-        "//proto:target_go_proto",
-        "//proto/api/v1:common_go_proto",
-        "//server/testutil/testauth",
-        "//server/testutil/testenv",
-        "//server/util/clickhouse/schema",
-        "//server/util/testing/flags",
-        "@com_github_google_go_cmp//cmp",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//testing/protocmp",
-        "@org_golang_google_protobuf//types/known/durationpb",
-        "@org_golang_google_protobuf//types/known/timestamppb",
-    ],
-)

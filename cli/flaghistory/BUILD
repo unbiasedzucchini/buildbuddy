@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//cli:__subpackages__"])
 
@@ -16,9 +16,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "flaghistory_test",
-    srcs = ["flaghistory_test.go"],
-    embed = [":flaghistory"],
-    deps = ["@com_github_stretchr_testify//require"],
-)

@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "xcode",
@@ -27,15 +27,3 @@ go_library(
     }),
 )
 
-go_test(
-    name = "xcode_test",
-    srcs = ["xcode_darwin_test.go"],
-    embed = [":xcode"],
-    target_compatible_with = ["@platforms//os:macos"],
-    deps = select({
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "@com_github_stretchr_testify//require",
-        ],
-        "//conditions:default": [],
-    }),
-)

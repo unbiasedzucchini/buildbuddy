@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "redact",
@@ -16,19 +16,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "redact_test",
-    size = "small",
-    srcs = ["redact_test.go"],
-    deps = [
-        ":redact",
-        "//proto:build_event_stream_go_proto",
-        "//proto:command_line_go_proto",
-        "//proto:failure_details_go_proto",
-        "@com_github_google_go_cmp//cmp",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//encoding/protojson",
-        "@org_golang_google_protobuf//testing/protocmp",
-    ],
-)

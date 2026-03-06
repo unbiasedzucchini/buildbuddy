@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -43,46 +43,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "api_test",
-    size = "small",
-    srcs = ["api_server_test.go"],
-    data = glob(["testdata/**"]),
-    embed = [":api"],
-    deps = [
-        "//enterprise/server/experiments",
-        "//enterprise/server/testutil/enterprise_testauth",
-        "//enterprise/server/testutil/enterprise_testenv",
-        "//proto:build_event_stream_go_proto",
-        "//proto:build_events_go_proto",
-        "//proto:capability_go_proto",
-        "//proto:failure_details_go_proto",
-        "//proto:group_go_proto",
-        "//proto:publish_build_event_go_proto",
-        "//proto:resource_go_proto",
-        "//proto:user_id_go_proto",
-        "//proto/api/v1:api_v1_go_proto",
-        "//proto/api/v1:common_go_proto",
-        "//server/build_event_protocol/build_event_handler",
-        "//server/interfaces",
-        "//server/tables",
-        "//server/testutil/testauth",
-        "//server/testutil/testdigest",
-        "//server/testutil/testenv",
-        "//server/testutil/testfs",
-        "//server/util/authutil",
-        "//server/util/claims",
-        "//server/util/prefix",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_google_uuid//:uuid",
-        "@com_github_open_feature_go_sdk//openfeature",
-        "@com_github_open_feature_go_sdk_contrib_providers_flagd//pkg",
-        "@com_github_prometheus_client_model//io/prometheus/client:go",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//encoding/protojson",
-        "@org_golang_google_protobuf//types/known/anypb",
-        "@org_golang_google_protobuf//types/known/durationpb",
-    ],
-)

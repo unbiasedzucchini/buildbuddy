@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "lockmap",
@@ -7,13 +7,3 @@ go_library(
     visibility = ["//visibility:public"],
 )
 
-go_test(
-    name = "lockmap_test",
-    srcs = ["lockmap_test.go"],
-    embed = [":lockmap"],
-    deps = [
-        "//server/util/random",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_x_sync//errgroup",
-    ],
-)

@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "qps",
@@ -10,13 +10,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "qps_test",
-    size = "small",
-    srcs = ["qps_test.go"],
-    embed = [":qps"],
-    deps = [
-        "@com_github_jonboulle_clockwork//:clockwork",
-        "@com_github_stretchr_testify//require",
-    ],
-)

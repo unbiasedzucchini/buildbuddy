@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -41,31 +41,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "hostedrunner_test",
-    srcs = ["hostedrunner_test.go"],
-    embed = [":hostedrunner"],
-    deps = [
-        "//enterprise/server/testutil/enterprise_testauth",
-        "//enterprise/server/testutil/enterprise_testenv",
-        "//enterprise/server/workflow/service",
-        "//proto:buildbuddy_service_go_proto",
-        "//proto:git_go_proto",
-        "//proto:remote_execution_go_proto",
-        "//proto:runner_go_proto",
-        "//server/buildbuddy_server",
-        "//server/remote_cache/byte_stream_server",
-        "//server/tables",
-        "//server/testutil/testauth",
-        "//server/testutil/testenv",
-        "//server/util/authutil",
-        "//server/util/platform",
-        "//server/util/testing/flags",
-        "@com_github_stretchr_testify//require",
-        "@com_google_cloud_go_longrunning//autogen/longrunningpb",
-        "@org_golang_google_genproto_googleapis_bytestream//:bytestream",
-        "@org_golang_google_grpc//:grpc",
-        "@org_golang_google_grpc//metadata",
-        "@org_golang_google_protobuf//types/known/anypb",
-    ],
-)

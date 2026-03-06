@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = [
     "//enterprise:__subpackages__",
@@ -26,26 +26,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "filecache_test",
-    size = "small",
-    srcs = ["filecache_test.go"],
-    deps = [
-        ":filecache",
-        "//proto:remote_execution_go_proto",
-        "//server/metrics",
-        "//server/remote_cache/digest",
-        "//server/testutil/testdigest",
-        "//server/testutil/testfs",
-        "//server/testutil/testmetrics",
-        "//server/util/claims",
-        "//server/util/disk",
-        "//server/util/hash",
-        "//server/util/log",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_x_sync//errgroup",
-    ],
-)

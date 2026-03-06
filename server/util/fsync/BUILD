@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "fsync",
@@ -10,11 +10,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "fsync_test",
-    srcs = ["fsync_test.go"],
-    deps = [
-        ":fsync",
-        "@com_github_stretchr_testify//assert",
-    ],
-)

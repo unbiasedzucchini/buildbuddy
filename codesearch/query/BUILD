@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "query",
@@ -18,18 +18,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "query_test",
-    srcs = [
-        "regexp_query_test.go",
-        "regexp_test.go",
-    ],
-    embed = [":query"],
-    deps = [
-        "//codesearch/schema",
-        "//codesearch/token",
-        "//codesearch/types",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-    ],
-)

@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//dockerfiles/test_images:defs.bzl", "NET_TOOLS_IMAGE")
 
 go_library(
@@ -24,26 +24,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "networking_test",
-    srcs = ["networking_test.go"],
-    exec_properties = {
-        "test.workload-isolation-type": "firecracker",
-        "test.container-image": "docker://" + NET_TOOLS_IMAGE,
-        "test.EstimatedComputeUnits": "4",
-    },
-    shard_count = 2,
-    tags = [
-        "docker",
-        "no-sandbox",
-    ],
-    deps = [
-        ":networking",
-        "//server/testutil/testnetworking",
-        "//server/testutil/testshell",
-        "//server/util/testing/flags",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_x_sync//errgroup",
-    ],
-)

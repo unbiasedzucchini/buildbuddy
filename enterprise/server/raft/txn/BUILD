@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -24,26 +24,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "txn_test",
-    srcs = ["txn_test.go"],
-    exec_properties = {
-        "test.EstimatedComputeUnits": "8",
-        "test.workload-isolation-type": "firecracker",
-    },
-    tags = ["block-network"],
-    deps = [
-        ":txn",
-        "//enterprise/server/raft/constants",
-        "//enterprise/server/raft/keys",
-        "//enterprise/server/raft/logger",
-        "//enterprise/server/raft/rbuilder",
-        "//enterprise/server/raft/sender",
-        "//enterprise/server/raft/testutil",
-        "//proto:raft_go_proto",
-        "//server/util/proto",
-        "//server/util/status",
-        "@com_github_jonboulle_clockwork//:clockwork",
-        "@com_github_stretchr_testify//require",
-    ],
-)

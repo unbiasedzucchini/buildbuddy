@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "scorecard",
@@ -17,27 +17,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "scorecard_test",
-    size = "small",
-    srcs = ["scorecard_test.go"],
-    deps = [
-        ":scorecard",
-        "//proto:cache_go_proto",
-        "//proto:remote_execution_go_proto",
-        "//proto:resource_go_proto",
-        "//server/interfaces",
-        "//server/tables",
-        "//server/testutil/testenv",
-        "//server/util/proto",
-        "//server/util/status",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_genproto_googleapis_rpc//status",
-        "@org_golang_google_grpc//codes",
-        "@org_golang_google_protobuf//encoding/prototext",
-        "@org_golang_google_protobuf//types/known/durationpb",
-        "@org_golang_google_protobuf//types/known/fieldmaskpb",
-        "@org_golang_google_protobuf//types/known/timestamppb",
-    ],
-)

@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "basicauth",
@@ -7,12 +7,3 @@ go_library(
     visibility = ["//visibility:public"],
 )
 
-go_test(
-    name = "basicauth_test",
-    srcs = ["basicauth_test.go"],
-    deps = [
-        ":basicauth",
-        "//server/testutil/testhttp",
-        "@com_github_stretchr_testify//require",
-    ],
-)

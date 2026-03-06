@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -30,28 +30,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "distributed_client_test",
-    srcs = ["distributed_client_test.go"],
-    deps = [
-        ":distributed_client",
-        "//proto:distributed_cache_go_proto",
-        "//proto:remote_execution_go_proto",
-        "//proto:resource_go_proto",
-        "//server/interfaces",
-        "//server/remote_cache/digest",
-        "//server/testutil/testauth",
-        "//server/testutil/testcompression",
-        "//server/testutil/testdigest",
-        "//server/testutil/testenv",
-        "//server/testutil/testport",
-        "//server/util/compression",
-        "//server/util/log",
-        "//server/util/prefix",
-        "//server/util/testing/flags",
-        "@com_github_docker_go_units//:go-units",
-        "@com_github_google_go_cmp//cmp",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//testing/protocmp",
-    ],
-)

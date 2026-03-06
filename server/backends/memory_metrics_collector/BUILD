@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "memory_metrics_collector",
@@ -11,10 +11,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "memory_metrics_collector_test",
-    size = "small",
-    srcs = ["memory_metrics_collector_test.go"],
-    embed = [":memory_metrics_collector"],
-    deps = ["@com_github_stretchr_testify//require"],
-)

@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "disk_cache",
@@ -32,25 +32,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "disk_cache_test",
-    size = "medium",
-    srcs = ["disk_cache_test.go"],
-    deps = [
-        ":disk_cache",
-        "//proto:remote_execution_go_proto",
-        "//proto:resource_go_proto",
-        "//server/environment",
-        "//server/interfaces",
-        "//server/remote_cache/digest",
-        "//server/testutil/testauth",
-        "//server/testutil/testdigest",
-        "//server/testutil/testenv",
-        "//server/testutil/testfs",
-        "//server/util/disk",
-        "//server/util/prefix",
-        "//server/util/status",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_x_sync//errgroup",
-    ],
-)

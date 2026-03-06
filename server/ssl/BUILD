@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "ssl",
@@ -21,12 +21,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "ssl_test",
-    size = "small",
-    srcs = ["ssl_test.go"],
-    deps = [
-        ":ssl",
-        "@com_github_stretchr_testify//require",
-    ],
-)

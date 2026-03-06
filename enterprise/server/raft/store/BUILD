@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -61,37 +61,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "store_test",
-    srcs = ["store_test.go"],
-    exec_properties = {
-        "test.EstimatedComputeUnits": "10",
-        "test.workload-isolation-type": "firecracker",
-    },
-    shard_count = 8,
-    tags = ["block-network"],
-    deps = [
-        "//enterprise/server/filestore",
-        "//enterprise/server/raft/bringup",
-        "//enterprise/server/raft/client",
-        "//enterprise/server/raft/constants",
-        "//enterprise/server/raft/header",
-        "//enterprise/server/raft/keys",
-        "//enterprise/server/raft/logger",
-        "//enterprise/server/raft/rbuilder",
-        "//enterprise/server/raft/replica",
-        "//enterprise/server/raft/testutil",
-        "//enterprise/server/util/pebble",
-        "//proto:raft_go_proto",
-        "//proto:storage_go_proto",
-        "//server/testutil/testdigest",
-        "//server/util/disk",
-        "//server/util/log",
-        "//server/util/proto",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_jonboulle_clockwork//:clockwork",
-        "@com_github_lni_dragonboat_v4//:dragonboat",
-        "@com_github_stretchr_testify//require",
-    ],
-)

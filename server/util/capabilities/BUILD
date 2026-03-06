@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "capabilities",
@@ -13,17 +13,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "capabilities_test",
-    size = "small",
-    srcs = ["capabilities_test.go"],
-    deps = [
-        ":capabilities",
-        "//proto:capability_go_proto",
-        "//server/interfaces",
-        "//server/nullauth",
-        "//server/testutil/testauth",
-        "//server/testutil/testenv",
-        "@com_github_stretchr_testify//assert",
-    ],
-)

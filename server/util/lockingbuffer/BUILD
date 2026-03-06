@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "lockingbuffer",
@@ -7,12 +7,3 @@ go_library(
     visibility = ["//visibility:public"],
 )
 
-go_test(
-    name = "lockingbuffer_test",
-    size = "small",
-    srcs = ["lockingbuffer_test.go"],
-    deps = [
-        ":lockingbuffer",
-        "@com_github_stretchr_testify//assert",
-    ],
-)

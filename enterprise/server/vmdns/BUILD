@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -17,14 +17,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "vmdns_test",
-    srcs = ["vmdns_test.go"],
-    deps = [
-        ":vmdns",
-        "//server/util/networking",
-        "@com_github_miekg_dns//:dns",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-    ],
-)

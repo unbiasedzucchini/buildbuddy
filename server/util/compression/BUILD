@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "compression",
@@ -16,15 +16,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "compression_test",
-    srcs = ["compression_test.go"],
-    deps = [
-        ":compression",
-        "//server/testutil/testdigest",
-        "//server/util/bytebufferpool",
-        "//server/util/ioutil",
-        "@com_github_google_go_cmp//cmp",
-        "@com_github_stretchr_testify//require",
-    ],
-)

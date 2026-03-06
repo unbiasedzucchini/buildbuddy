@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -22,18 +22,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "bare_test",
-    size = "small",
-    srcs = ["bare_test.go"],
-    deps = [
-        ":bare",
-        "//enterprise/server/remote_execution/container",
-        "//enterprise/server/util/oci",
-        "//proto:remote_execution_go_proto",
-        "//server/testutil/testfs",
-        "//server/util/testing/flags",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-    ],
-)

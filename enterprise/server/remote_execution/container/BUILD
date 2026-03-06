@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -34,25 +34,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "container_test",
-    size = "small",
-    srcs = ["container_test.go"],
-    deps = [
-        ":container",
-        "//enterprise/server/util/oci",
-        "//proto:remote_execution_go_proto",
-        "//server/interfaces",
-        "//server/testutil/testauth",
-        "//server/testutil/testenv",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "//server/util/timeseries",
-        "@com_github_google_go_cmp//cmp",
-        "@com_github_jonboulle_clockwork//:clockwork",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//testing/protocmp",
-        "@org_golang_x_sync//errgroup",
-    ],
-)

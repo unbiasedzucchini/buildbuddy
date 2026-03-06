@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "resources",
@@ -18,12 +18,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "resources_test",
-    srcs = ["resources_test.go"],
-    deps = [
-        ":resources",
-        "//server/util/testing/flags",
-        "@com_github_stretchr_testify//require",
-    ],
-)

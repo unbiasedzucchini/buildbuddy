@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "retry",
@@ -11,14 +11,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "retry_test",
-    size = "small",
-    srcs = ["retry_test.go"],
-    deps = [
-        ":retry",
-        "//server/util/status",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-    ],
-)

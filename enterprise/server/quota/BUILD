@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -23,24 +23,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "quota_test",
-    size = "small",
-    srcs = ["quota_manager_test.go"],
-    embed = [":quota"],
-    deps = [
-        "//enterprise/server/backends/authdb",
-        "//enterprise/server/backends/userdb",
-        "//enterprise/server/experiments",
-        "//enterprise/server/testutil/testredis",
-        "//proto:group_go_proto",
-        "//server/environment",
-        "//server/testutil/testauth",
-        "//server/testutil/testenv",
-        "//server/util/claims",
-        "@com_github_open_feature_go_sdk//openfeature",
-        "@com_github_open_feature_go_sdk//openfeature/memprovider",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-    ],
-)

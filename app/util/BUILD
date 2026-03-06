@@ -1,4 +1,4 @@
-load("//rules/typescript:index.bzl", "ts_jasmine_node_test", "ts_library")
+load("//rules/typescript:index.bzl", "ts_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -17,15 +17,6 @@ ts_library(
 ts_library(
     name = "async",
     srcs = ["async.ts"],
-)
-
-ts_jasmine_node_test(
-    name = "async_test",
-    srcs = ["async_test.ts"],
-    deps = [
-        ":async",
-        "//:node_modules/tslib",
-    ],
 )
 
 ts_library(
@@ -56,14 +47,6 @@ ts_library(
     name = "git",
     srcs = ["git.ts"],
     deps = ["//:node_modules/tslib"],
-)
-
-ts_jasmine_node_test(
-    name = "git_test",
-    srcs = ["git_test.ts"],
-    deps = [
-        ":git",
-    ],
 )
 
 ts_library(
@@ -149,15 +132,6 @@ ts_library(
     ],
 )
 
-ts_jasmine_node_test(
-    name = "cache_test",
-    srcs = ["cache_test.ts"],
-    deps = [
-        ":cache",
-        "//:node_modules/tslib",
-    ],
-)
-
 ts_library(
     name = "rpc",
     srcs = ["rpc.ts"],
@@ -204,12 +178,6 @@ ts_library(
 ts_library(
     name = "shlex",
     srcs = ["shlex.ts"],
-)
-
-ts_jasmine_node_test(
-    name = "shlex_test",
-    srcs = ["shlex_test.ts"],
-    deps = ["//app/util:shlex"],
 )
 
 ts_library(

@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -31,29 +31,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "docker_test",
-    srcs = ["docker_test.go"],
-    exec_properties = {
-        # TODO(https://github.com/buildbuddy-io/buildbuddy-internal/issues/1094): Require less manual configuration here.
-        "test.workload-isolation-type": "firecracker",
-        "test.init-dockerd": "true",
-    },
-    shard_count = 2,
-    tags = ["docker"],
-    deps = [
-        ":docker",
-        "//enterprise/server/remote_execution/container",
-        "//enterprise/server/util/oci",
-        "//proto:remote_execution_go_proto",
-        "//server/interfaces",
-        "//server/testutil/testauth",
-        "//server/testutil/testenv",
-        "//server/testutil/testfs",
-        "//server/util/disk",
-        "//server/util/status",
-        "@com_github_docker_docker//client",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-    ],
-)

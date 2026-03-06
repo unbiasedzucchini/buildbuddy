@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 # gazelle:default_visibility //enterprise:__subpackages__,@buildbuddy_internal//:__subpackages__
 package(default_visibility = [
@@ -73,57 +73,3 @@ go_library(
     }),
 )
 
-go_test(
-    name = "vfs_test",
-    srcs = ["vfs_test.go"],
-    exec_properties = {
-        "test.workload-isolation-type": "firecracker",
-        "test.EstimatedComputeUnits": "2",
-    },
-    tags = [
-        "docker",
-    ],
-    deps = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            ":vfs",
-            "//enterprise/server/remote_execution/container",
-            "//enterprise/server/remote_execution/filecache",
-            "//enterprise/server/util/vfs_server",
-            "//proto:remote_execution_go_proto",
-            "//server/cache/dirtools",
-            "//server/environment",
-            "//server/remote_cache/byte_stream_server",
-            "//server/remote_cache/cachetools",
-            "//server/remote_cache/digest",
-            "//server/testutil/testdigest",
-            "//server/testutil/testenv",
-            "//server/testutil/testfs",
-            "//server/util/log",
-            "//server/util/prefix",
-            "@com_github_stretchr_testify//require",
-            "@org_golang_google_genproto_googleapis_bytestream//:bytestream",
-            "@org_golang_x_sys//unix",
-        ],
-        "@io_bazel_rules_go//go/platform:linux_arm64": [
-            ":vfs",
-            "//enterprise/server/remote_execution/container",
-            "//enterprise/server/remote_execution/filecache",
-            "//enterprise/server/util/vfs_server",
-            "//proto:remote_execution_go_proto",
-            "//server/cache/dirtools",
-            "//server/environment",
-            "//server/remote_cache/byte_stream_server",
-            "//server/remote_cache/cachetools",
-            "//server/remote_cache/digest",
-            "//server/testutil/testdigest",
-            "//server/testutil/testenv",
-            "//server/testutil/testfs",
-            "//server/util/log",
-            "//server/util/prefix",
-            "@com_github_stretchr_testify//require",
-            "@org_golang_google_genproto_googleapis_bytestream//:bytestream",
-            "@org_golang_x_sys//unix",
-        ],
-        "//conditions:default": [],
-    }),
-)

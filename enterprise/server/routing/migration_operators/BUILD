@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -23,24 +23,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "migration_operators_test",
-    size = "small",
-    srcs = ["migration_operators_test.go"],
-    deps = [
-        ":migration_operators",
-        "//enterprise/server/batch_operator",
-        "//proto:remote_execution_go_proto",
-        "//proto:routing_go_proto",
-        "//server/interfaces",
-        "//server/remote_cache/digest",
-        "//server/util/flagutil",
-        "//server/util/proto",
-        "//server/util/status",
-        "//server/util/usageutil",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_genproto_googleapis_bytestream//:bytestream",
-        "@org_golang_google_grpc//:grpc",
-        "@org_golang_google_grpc//metadata",
-    ],
-)

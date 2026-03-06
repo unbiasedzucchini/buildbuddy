@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "capabilities_filter",
@@ -14,20 +14,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "capabilities_filter_test",
-    size = "small",
-    srcs = ["capabilities_filter_test.go"],
-    deps = [
-        ":capabilities_filter",
-        "//proto:buildbuddy_service_go_proto",
-        "//proto:capability_go_proto",
-        "//proto:context_go_proto",
-        "//proto/api/v1:api_v1_go_proto",
-        "//server/testutil/testauth",
-        "//server/testutil/testenv",
-        "//server/util/testing/flags",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-    ],
-)

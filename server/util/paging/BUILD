@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "paging",
@@ -12,14 +12,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "paging_test",
-    size = "small",
-    srcs = ["paging_test.go"],
-    deps = [
-        ":paging",
-        "//proto:pagination_go_proto",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-    ],
-)

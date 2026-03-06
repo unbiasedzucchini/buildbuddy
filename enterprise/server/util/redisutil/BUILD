@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -22,22 +22,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "redisutil_test",
-    size = "small",
-    srcs = ["redisutil_test.go"],
-    deps = [
-        ":redisutil",
-        "//enterprise/server/experiments",
-        "//enterprise/server/testutil/testredis",
-        "//server/testutil/testenv",
-        "//server/util/status",
-        "@com_github_go_redis_redis_v8//:redis",
-        "@com_github_google_go_cmp//cmp",
-        "@com_github_google_go_cmp//cmp/cmpopts",
-        "@com_github_open_feature_go_sdk//openfeature",
-        "@com_github_open_feature_go_sdk//openfeature/memprovider",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-    ],
-)

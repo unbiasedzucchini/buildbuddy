@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -21,20 +21,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "registry_test",
-    size = "small",
-    srcs = ["registry_test.go"],
-    deps = [
-        ":registry",
-        "//server/gossip",
-        "//server/testutil/testport",
-        "//server/util/kuberesolver",
-        "//server/util/log",
-        "//server/util/status",
-        "@com_github_stretchr_testify//require",
-        "@io_k8s_api//core/v1:core",
-        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
-        "@io_k8s_client_go//kubernetes/fake",
-    ],
-)

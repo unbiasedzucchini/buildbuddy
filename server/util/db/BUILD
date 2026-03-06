@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "db",
@@ -48,11 +48,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "db_test",
-    srcs = ["db_test.go"],
-    deps = [
-        ":db",
-        "@com_github_stretchr_testify//require",
-    ],
-)

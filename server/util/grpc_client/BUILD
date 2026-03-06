@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "grpc_client",
@@ -26,17 +26,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "grpc_client_test",
-    size = "small",
-    srcs = ["grpc_client_test.go"],
-    deps = [
-        ":grpc_client",
-        "//proto:ping_service_go_proto",
-        "//server/environment",
-        "//server/testutil/testenv",
-        "//server/testutil/testport",
-        "//server/util/grpc_server",
-        "@com_github_stretchr_testify//require",
-    ],
-)

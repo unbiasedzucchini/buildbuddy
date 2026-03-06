@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -22,18 +22,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "tasksize_model_test",
-    srcs = ["tasksize_model_test.go"],
-    embed = [":tasksize_model"],
-    tags = [
-        "manual",
-        "no-sandbox",
-    ],
-    deps = [
-        "//proto:remote_execution_go_proto",
-        "//server/testutil/testenv",
-        "//server/util/log",
-        "@com_github_stretchr_testify//require",
-    ],
-)

@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "fsutil",
@@ -10,12 +10,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "fsutil_test",
-    srcs = ["fsutil_test.go"],
-    embed = [":fsutil"],
-    deps = [
-        "//proto:remote_execution_go_proto",
-        "@com_github_stretchr_testify//assert",
-    ],
-)

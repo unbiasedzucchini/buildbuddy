@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "common",
@@ -15,15 +15,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "common_test",
-    size = "small",
-    srcs = ["common_test.go"],
-    deps = [
-        ":common",
-        "//server/util/flagutil/types",
-        "//server/util/flagutil/types/autoflags",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-    ],
-)

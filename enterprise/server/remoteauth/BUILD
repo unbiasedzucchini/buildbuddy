@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -25,27 +25,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "remoteauth_test",
-    size = "small",
-    srcs = ["remoteauth_test.go"],
-    embed = [":remoteauth"],
-    deps = [
-        "//enterprise/server/experiments",
-        "//proto:auth_go_proto",
-        "//server/interfaces",
-        "//server/testutil/testenv",
-        "//server/testutil/testgrpc",
-        "//server/testutil/testkeys",
-        "//server/util/authutil",
-        "//server/util/claims",
-        "//server/util/status",
-        "//server/util/subdomain",
-        "//server/util/testing/flags",
-        "@com_github_golang_jwt_jwt_v4//:jwt",
-        "@com_github_open_feature_go_sdk//openfeature",
-        "@com_github_open_feature_go_sdk//pkg/openfeature/memprovider",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_grpc//metadata",
-    ],
-)

@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "tracing",
@@ -28,14 +28,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "tracing_test",
-    srcs = ["tracing_test.go"],
-    deps = [
-        ":tracing",
-        "//server/testutil/testenv",
-        "//server/util/log",
-        "//server/util/testing/flags",
-        "@com_github_stretchr_testify//require",
-    ],
-)

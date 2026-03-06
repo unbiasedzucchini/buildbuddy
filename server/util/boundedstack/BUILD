@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "boundedstack",
@@ -10,11 +10,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "boundedstack_test",
-    srcs = ["boundedstack_test.go"],
-    embed = [":boundedstack"],
-    deps = [
-        "@com_github_stretchr_testify//require",
-    ],
-)

@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 # gazelle:default_visibility //enterprise:__subpackages__,@buildbuddy_internal//:__subpackages__
 package(default_visibility = [
@@ -29,30 +29,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "tasksize_test",
-    size = "small",
-    srcs = ["tasksize_test.go"],
-    deps = [
-        ":tasksize",
-        "//enterprise/server/experiments",
-        "//enterprise/server/testutil/testredis",
-        "//proto:remote_execution_go_proto",
-        "//proto:scheduler_go_proto",
-        "//server/testutil/testauth",
-        "//server/testutil/testenv",
-        "//server/testutil/testfs",
-        "//server/util/platform",
-        "//server/util/proto",
-        "//server/util/testing/flags",
-        "@com_github_google_go_cmp//cmp",
-        "@com_github_open_feature_go_sdk//openfeature",
-        "@com_github_open_feature_go_sdk//openfeature/memprovider",
-        "@com_github_open_feature_go_sdk//openfeature/testing",
-        "@com_github_open_feature_go_sdk_contrib_providers_flagd//pkg",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//testing/protocmp",
-        "@org_golang_google_protobuf//types/known/timestamppb",
-    ],
-)

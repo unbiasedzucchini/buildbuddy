@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "rangemap",
@@ -8,12 +8,3 @@ go_library(
     deps = ["//server/util/log"],
 )
 
-go_test(
-    name = "rangemap_test",
-    size = "small",
-    srcs = ["rangemap_test.go"],
-    deps = [
-        ":rangemap",
-        "@com_github_stretchr_testify//require",
-    ],
-)

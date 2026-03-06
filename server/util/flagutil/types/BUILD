@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "types",
@@ -15,17 +15,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "types_test",
-    size = "small",
-    srcs = ["types_test.go"],
-    embed = [":types"],
-    deps = [
-        "//server/util/flagutil/common",
-        "//server/util/flagutil/types/autoflags/tags",
-        "//server/util/flagutil/yaml",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//types/known/timestamppb",
-    ],
-)

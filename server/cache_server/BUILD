@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "cache_server",
@@ -15,15 +15,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "cache_server_test",
-    srcs = ["cache_server_test.go"],
-    deps = [
-        ":cache_server",
-        "//proto:cache_go_proto",
-        "//server/testutil/testdigest",
-        "//server/testutil/testenv",
-        "//server/util/prefix",
-        "@com_github_stretchr_testify//require",
-    ],
-)

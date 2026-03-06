@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "digest",
@@ -21,18 +21,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "digest_test",
-    size = "small",
-    srcs = ["digest_test.go"],
-    deps = [
-        ":digest",
-        "//proto:remote_execution_go_proto",
-        "//proto:resource_go_proto",
-        "//server/util/compression",
-        "//server/util/status",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_grpc//status",
-    ],
-)

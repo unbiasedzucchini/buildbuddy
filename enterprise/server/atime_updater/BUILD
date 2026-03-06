@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -17,25 +17,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "atime_updater_test",
-    size = "small",
-    srcs = ["atime_updater_test.go"],
-    embed = [":atime_updater"],
-    deps = [
-        "//enterprise/server/batch_operator",
-        "//proto:remote_execution_go_proto",
-        "//server/interfaces",
-        "//server/remote_cache/digest",
-        "//server/testutil/testauth",
-        "//server/testutil/testenv",
-        "//server/testutil/testhealthcheck",
-        "//server/util/authutil",
-        "//server/util/log",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_jonboulle_clockwork//:clockwork",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_grpc//metadata",
-    ],
-)

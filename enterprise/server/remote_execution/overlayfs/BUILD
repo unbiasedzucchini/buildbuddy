@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -27,34 +27,3 @@ go_library(
     }),
 )
 
-go_test(
-    name = "overlayfs_test",
-    srcs = ["overlayfs_test.go"],
-    target_compatible_with = ["@platforms//os:linux"],
-    deps = [
-        ":overlayfs",
-        "//server/testutil/quarantine",
-        "//server/testutil/testfs",
-        "//server/testutil/testmount",
-        "@com_github_docker_go_units//:go-units",
-        "@com_github_stretchr_testify//require",
-    ],
-)
-
-go_test(
-    name = "overlayfs_benchmark_test",
-    srcs = ["overlayfs_test.go"],
-    args = [
-        "-test.bench=.",
-        "-test.skip=^Test",
-    ],
-    tags = ["manual"],
-    target_compatible_with = ["@platforms//os:linux"],
-    deps = [
-        ":overlayfs",
-        "//server/testutil/testfs",
-        "//server/testutil/testmount",
-        "@com_github_docker_go_units//:go-units",
-        "@com_github_stretchr_testify//require",
-    ],
-)

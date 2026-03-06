@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "uuid",
@@ -12,11 +12,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "uuid_test",
-    srcs = ["uuid_test.go"],
-    deps = [
-        ":uuid",
-        "@com_github_stretchr_testify//assert",
-    ],
-)

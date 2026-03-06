@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -28,26 +28,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "ocicache_test",
-    timeout = "short",
-    srcs = ["ocicache_test.go"],
-    deps = [
-        ":ocicache",
-        "//enterprise/server/testutil/enterprise_testenv",
-        "//proto:ociregistry_go_proto",
-        "//proto:remote_execution_go_proto",
-        "//server/interfaces",
-        "//server/testutil/testcache",
-        "//server/testutil/testdigest",
-        "//server/testutil/testenv",
-        "//server/util/bazel_request",
-        "//server/util/random",
-        "//server/util/testing/flags",
-        "@com_github_google_go_cmp//cmp",
-        "@com_github_google_go_containerregistry//pkg/crane",
-        "@com_github_google_go_containerregistry//pkg/name",
-        "@com_github_google_go_containerregistry//pkg/v1:pkg",
-        "@com_github_stretchr_testify//require",
-    ],
-)

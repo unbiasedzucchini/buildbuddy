@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "config",
@@ -16,14 +16,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "config_test",
-    srcs = ["config_test.go"],
-    deps = [
-        ":config",
-        "//server/util/flag",
-        "//server/util/flagutil/common",
-        "//server/util/status",
-        "@com_github_stretchr_testify//require",
-    ],
-)

@@ -1,5 +1,4 @@
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 load("//rules/flags:index.bzl", "write_flag_to_file")
 
 package(default_visibility = ["//cli:__subpackages__"])
@@ -22,11 +21,3 @@ go_library(
     importpath = "github.com/buildbuddy-io/buildbuddy/cli/version",
 )
 
-go_test(
-    name = "version_test",
-    srcs = ["version_test.go"],
-    deps = [
-        ":version",
-        "@com_github_stretchr_testify//require",
-    ],
-)

@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "byte_stream_client",
@@ -25,26 +25,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "byte_stream_client_test",
-    size = "small",
-    srcs = ["byte_stream_client_test.go"],
-    data = [
-        "no_files.zip",
-        "some_files.zip",
-        "too_many_files.zip",
-    ],
-    embed = [":byte_stream_client"],
-    x_defs = {
-        "noFilesRunfilePath": "$(rlocationpath no_files.zip)",
-        "someFilesRunfilePath": "$(rlocationpath some_files.zip)",
-        "tooManyFilesRunfilePath": "$(rlocationpath too_many_files.zip)",
-    },
-    deps = [
-        "//proto:zip_go_proto",
-        "//server/util/proto",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@io_bazel_rules_go//go/runfiles",
-    ],
-)

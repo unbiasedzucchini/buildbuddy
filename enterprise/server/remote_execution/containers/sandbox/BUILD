@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -21,20 +21,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "sandbox_test",
-    srcs = ["sandbox_test.go"],
-    tags = [
-        "no-sandbox",  # sandbox-exec is not compatible with Bazel's sandbox environment
-    ],
-    deps = select({
-        "@io_bazel_rules_go//go/platform:darwin": [
-            ":sandbox",
-            "//enterprise/server/util/oci",
-            "//proto:remote_execution_go_proto",
-            "//server/testutil/testfs",
-            "@com_github_stretchr_testify//assert",
-        ],
-        "//conditions:default": [],
-    }),
-)

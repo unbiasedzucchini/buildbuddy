@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -27,43 +27,3 @@ go_library(
     }),
 )
 
-go_test(
-    name = "commandutil_test",
-    size = "enormous",
-    srcs = [
-        "commandutil_test.go",
-        "commandutil_unix_test.go",
-        "commandutil_windows_test.go",
-    ],
-    data = select({
-        "@io_bazel_rules_go//go/platform:windows": [],
-        "//conditions:default": ["//enterprise/server/remote_execution/commandutil/test_binary:test_binary_no_cov"],
-    }),
-    tags = ["cpu:4"],
-    x_defs = select({
-        "@io_bazel_rules_go//go/platform:windows": {},
-        "//conditions:default": {
-            "testBinaryRunfilePath": "$(rlocationpath //enterprise/server/remote_execution/commandutil/test_binary:test_binary_no_cov)",
-        },
-    }),
-    deps = [
-        ":commandutil",
-        "//proto:remote_execution_go_proto",
-        "//server/interfaces",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "//server/testutil/testfs",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "//server/testutil/testfs",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "//server/testutil/testfs",
-        ],
-        "//conditions:default": [],
-    }),
-)

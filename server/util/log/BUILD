@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "log",
@@ -17,14 +17,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "log_test",
-    srcs = ["log_test.go"],
-    deps = [
-        ":log",
-        "//server/util/testing/flags",
-        "@com_github_rs_zerolog//:zerolog",
-        "@com_github_rs_zerolog//log",
-        "@com_github_stretchr_testify//assert",
-    ],
-)

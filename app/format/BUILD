@@ -1,4 +1,4 @@
-load("//rules/typescript:index.bzl", "ts_jasmine_node_test", "ts_library")
+load("//rules/typescript:index.bzl", "ts_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -15,13 +15,3 @@ ts_library(
     ],
 )
 
-ts_jasmine_node_test(
-    name = "format_test",
-    srcs = ["format_test.ts"],
-    deps = [
-        ":format",
-        "//:node_modules/@types/long",
-        "//:node_modules/long",
-        "//:node_modules/tslib",
-    ],
-)

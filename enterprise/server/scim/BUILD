@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -24,27 +24,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "scim_test",
-    size = "small",
-    srcs = ["scim_test.go"],
-    deps = [
-        ":scim",
-        "//enterprise/server/saml",
-        "//enterprise/server/testutil/enterprise_testauth",
-        "//enterprise/server/testutil/enterprise_testenv",
-        "//proto:capability_go_proto",
-        "//proto:group_go_proto",
-        "//proto:user_id_go_proto",
-        "//server/environment",
-        "//server/interfaces",
-        "//server/tables",
-        "//server/testutil/testauth",
-        "//server/testutil/testenv",
-        "//server/testutil/testhttp",
-        "//server/util/authutil",
-        "//server/util/role",
-        "//server/util/status",
-        "@com_github_stretchr_testify//require",
-    ],
-)

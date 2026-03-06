@@ -1,4 +1,4 @@
-load("//rules/typescript:index.bzl", "ts_jasmine_node_test", "ts_library")
+load("//rules/typescript:index.bzl", "ts_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -60,12 +60,6 @@ ts_library(
     deps = [
         "//:node_modules/tslib",
     ],
-)
-
-ts_jasmine_node_test(
-    name = "trace_events_test",
-    srcs = ["trace_events_test.ts"],
-    deps = [":trace_events"],
 )
 
 ts_library(

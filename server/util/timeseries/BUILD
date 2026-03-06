@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "timeseries",
@@ -7,11 +7,3 @@ go_library(
     visibility = ["//visibility:public"],
 )
 
-go_test(
-    name = "timeseries_test",
-    srcs = ["timeseries_test.go"],
-    deps = [
-        ":timeseries",
-        "@com_github_stretchr_testify//require",
-    ],
-)

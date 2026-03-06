@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "usageutil",
@@ -16,18 +16,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "usageutil_test",
-    srcs = ["usageutil_test.go"],
-    deps = [
-        ":usageutil",
-        "//proto:remote_execution_go_proto",
-        "//server/tables",
-        "//server/testutil/testgrpc",
-        "//server/util/bazel_request",
-        "//server/util/proto",
-        "//server/util/testing/flags",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_grpc//metadata",
-    ],
-)

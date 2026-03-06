@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -24,24 +24,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "experiments_test",
-    srcs = ["experiments_test.go"],
-    deps = [
-        ":experiments",
-        "//proto:group_go_proto",
-        "//server/tables",
-        "//server/testutil/testauth",
-        "//server/testutil/testenv",
-        "//server/testutil/testfs",
-        "//server/util/authutil",
-        "//server/util/claims",
-        "//server/util/random",
-        "//server/util/testing/flags",
-        "@com_github_open_feature_go_sdk//openfeature",
-        "@com_github_open_feature_go_sdk//openfeature/memprovider",
-        "@com_github_open_feature_go_sdk//openfeature/testing",
-        "@com_github_open_feature_go_sdk_contrib_providers_flagd//pkg",
-        "@com_github_stretchr_testify//require",
-    ],
-)

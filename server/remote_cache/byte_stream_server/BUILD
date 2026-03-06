@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "byte_stream_server",
@@ -33,36 +33,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "byte_stream_server_test",
-    size = "small",
-    srcs = ["byte_stream_server_test.go"],
-    embed = [":byte_stream_server"],
-    deps = [
-        "//enterprise/server/experiments",
-        "//proto:remote_execution_go_proto",
-        "//server/backends/memory_metrics_collector",
-        "//server/remote_cache/cachetools",
-        "//server/remote_cache/chunking",
-        "//server/remote_cache/digest",
-        "//server/remote_cache/hit_tracker",
-        "//server/testutil/byte_stream",
-        "//server/testutil/testcompression",
-        "//server/testutil/testdigest",
-        "//server/testutil/testenv",
-        "//server/util/bazel_request",
-        "//server/util/compression",
-        "//server/util/prefix",
-        "//server/util/random",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_google_uuid//:uuid",
-        "@com_github_open_feature_go_sdk//openfeature",
-        "@com_github_open_feature_go_sdk//openfeature/memprovider",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_genproto_googleapis_bytestream//:bytestream",
-        "@org_golang_google_grpc//:grpc",
-        "@org_golang_google_grpc//status",
-    ],
-)

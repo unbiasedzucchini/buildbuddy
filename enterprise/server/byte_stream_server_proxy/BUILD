@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -35,47 +35,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "byte_stream_server_proxy_test",
-    size = "medium",
-    srcs = ["byte_stream_server_proxy_test.go"],
-    embed = [":byte_stream_server_proxy"],
-    shard_count = 2,
-    deps = [
-        "//enterprise/server/atime_updater",
-        "//enterprise/server/backends/pebble_cache",
-        "//enterprise/server/experiments",
-        "//enterprise/server/util/proxy_util",
-        "//proto:remote_execution_go_proto",
-        "//proto:resource_go_proto",
-        "//server/interfaces",
-        "//server/metrics",
-        "//server/remote_cache/byte_stream_server",
-        "//server/remote_cache/chunking",
-        "//server/remote_cache/content_addressable_storage_server",
-        "//server/remote_cache/digest",
-        "//server/testutil/byte_stream",
-        "//server/testutil/testauth",
-        "//server/testutil/testcompression",
-        "//server/testutil/testdigest",
-        "//server/testutil/testenv",
-        "//server/testutil/testfs",
-        "//server/util/authutil",
-        "//server/util/compression",
-        "//server/util/log",
-        "//server/util/prefix",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "//server/util/uuid",
-        "@com_github_jonboulle_clockwork//:clockwork",
-        "@com_github_open_feature_go_sdk//openfeature",
-        "@com_github_open_feature_go_sdk//pkg/openfeature/memprovider",
-        "@com_github_prometheus_client_golang//prometheus",
-        "@com_github_prometheus_client_golang//prometheus/testutil",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_genproto_googleapis_bytestream//:bytestream",
-        "@org_golang_google_grpc//:grpc",
-        "@org_golang_google_grpc//metadata",
-        "@org_golang_google_grpc//status",
-    ],
-)

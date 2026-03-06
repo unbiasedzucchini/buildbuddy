@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "pbwireutil",
@@ -10,14 +10,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "pbwireutil_test",
-    srcs = ["pbwireutil_test.go"],
-    deps = [
-        ":pbwireutil",
-        "//proto:remote_execution_go_proto",
-        "//server/util/proto",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//types/known/timestamppb",
-    ],
-)

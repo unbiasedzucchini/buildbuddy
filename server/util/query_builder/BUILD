@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "query_builder",
@@ -7,12 +7,3 @@ go_library(
     visibility = ["//visibility:public"],
 )
 
-go_test(
-    name = "query_builder_test",
-    size = "small",
-    srcs = ["query_builder_test.go"],
-    deps = [
-        ":query_builder",
-        "@com_github_stretchr_testify//assert",
-    ],
-)

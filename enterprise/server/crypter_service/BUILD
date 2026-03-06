@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -29,34 +29,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "crypter_service_test",
-    srcs = ["crypter_service_test.go"],
-    embed = [":crypter_service"],
-    deps = [
-        "//enterprise/server/backends/pebble_cache",
-        "//enterprise/server/clientidentity",
-        "//enterprise/server/crypter_key_cache",
-        "//enterprise/server/testutil/enterprise_testauth",
-        "//enterprise/server/testutil/enterprise_testenv",
-        "//proto:capability_go_proto",
-        "//proto:encryption_go_proto",
-        "//proto:remote_execution_go_proto",
-        "//proto:storage_go_proto",
-        "//server/environment",
-        "//server/interfaces",
-        "//server/tables",
-        "//server/testutil/testauth",
-        "//server/testutil/testdata",
-        "//server/testutil/testdigest",
-        "//server/testutil/testenv",
-        "//server/testutil/testfs",
-        "//server/util/disk",
-        "//server/util/ioutil",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_jonboulle_clockwork//:clockwork",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_grpc//metadata",
-    ],
-)

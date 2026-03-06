@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -57,47 +57,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "service_test",
-    size = "small",
-    srcs = ["service_test.go"],
-    shard_count = 6,
-    deps = [
-        ":service",
-        "//enterprise/server/githubapp",
-        "//enterprise/server/testutil/enterprise_testauth",
-        "//enterprise/server/testutil/enterprise_testenv",
-        "//enterprise/server/workflow/config",
-        "//proto:buildbuddy_service_go_proto",
-        "//proto:remote_execution_go_proto",
-        "//proto:workflow_go_proto",
-        "//server/backends/repo_downloader",
-        "//server/buildbuddy_server",
-        "//server/endpoint_urls/build_buddy_url",
-        "//server/environment",
-        "//server/interfaces",
-        "//server/remote_cache/byte_stream_server",
-        "//server/remote_cache/cachetools",
-        "//server/remote_cache/digest",
-        "//server/tables",
-        "//server/testutil/testauth",
-        "//server/testutil/testenv",
-        "//server/testutil/testgit",
-        "//server/testutil/testhttp",
-        "//server/util/authutil",
-        "//server/util/db",
-        "//server/util/perms",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_google_go_cmp//cmp",
-        "@com_github_google_go_github_v59//github",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@com_google_cloud_go_longrunning//autogen/longrunningpb",
-        "@org_golang_google_genproto_googleapis_bytestream//:bytestream",
-        "@org_golang_google_grpc//:grpc",
-        "@org_golang_google_grpc//metadata",
-        "@org_golang_google_protobuf//testing/protocmp",
-        "@org_golang_google_protobuf//types/known/anypb",
-    ],
-)

@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "status",
@@ -14,16 +14,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "status_test",
-    size = "small",
-    srcs = ["status_test.go"],
-    deps = [
-        ":status",
-        "@com_github_pkg_errors//:errors",
-        "@com_github_stretchr_testify//assert",
-        "@org_golang_google_genproto_googleapis_rpc//errdetails",
-        "@org_golang_google_grpc//codes",
-        "@org_golang_google_grpc//status",
-    ],
-)

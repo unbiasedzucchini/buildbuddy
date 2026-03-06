@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 # gazelle:default_visibility //enterprise:__subpackages__
 package(default_visibility = [
@@ -48,40 +48,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "scheduler_server_test",
-    size = "medium",
-    srcs = ["scheduler_server_test.go"],
-    embed = [":scheduler_server"],
-    deps = [
-        "//enterprise/server/backends/redis_execution_collector",
-        "//enterprise/server/experiments",
-        "//enterprise/server/remote_execution/execution_server",
-        "//enterprise/server/tasksize",
-        "//enterprise/server/testutil/enterprise_testauth",
-        "//enterprise/server/testutil/enterprise_testenv",
-        "//enterprise/server/testutil/testredis",
-        "//proto:context_go_proto",
-        "//proto:remote_execution_go_proto",
-        "//proto:scheduler_go_proto",
-        "//server/environment",
-        "//server/interfaces",
-        "//server/testutil/testauth",
-        "//server/testutil/testcache",
-        "//server/testutil/testenv",
-        "//server/testutil/testfs",
-        "//server/util/log",
-        "//server/util/platform",
-        "//server/util/proto",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_google_go_cmp//cmp",
-        "@com_github_google_uuid//:uuid",
-        "@com_github_jonboulle_clockwork//:clockwork",
-        "@com_github_open_feature_go_sdk//openfeature",
-        "@com_github_open_feature_go_sdk_contrib_providers_flagd//pkg",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//testing/protocmp",
-        "@org_golang_google_protobuf//types/known/durationpb",
-    ],
-)

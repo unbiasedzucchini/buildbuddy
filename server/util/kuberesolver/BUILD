@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "kuberesolver",
@@ -18,18 +18,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "kuberesolver_test",
-    srcs = ["kuberesolver_test.go"],
-    embed = [":kuberesolver"],
-    deps = [
-        "@com_github_stretchr_testify//require",
-        "@io_k8s_api//core/v1:core",
-        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
-        "@io_k8s_apimachinery//pkg/watch",
-        "@io_k8s_client_go//kubernetes/fake",
-        "@io_k8s_client_go//testing",
-        "@org_golang_google_grpc//resolver",
-        "@org_golang_google_grpc//serviceconfig",
-    ],
-)

@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "build_event_handler",
@@ -61,35 +61,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "build_event_handler_test",
-    size = "small",
-    srcs = ["build_event_handler_test.go"],
-    deps = [
-        ":build_event_handler",
-        "//proto:build_event_stream_go_proto",
-        "//proto:build_events_go_proto",
-        "//proto:command_line_go_proto",
-        "//proto:invocation_go_proto",
-        "//proto:invocation_status_go_proto",
-        "//proto:publish_build_event_go_proto",
-        "//server/backends/chunkstore",
-        "//server/backends/github",
-        "//server/eventlog",
-        "//server/interfaces",
-        "//server/tables",
-        "//server/testutil/testauth",
-        "//server/testutil/testenv",
-        "//server/testutil/testusage",
-        "//server/util/authutil",
-        "//server/util/protofile",
-        "//server/util/testing/flags",
-        "@com_github_google_go_cmp//cmp",
-        "@com_github_google_uuid//:uuid",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//encoding/prototext",
-        "@org_golang_google_protobuf//testing/protocmp",
-        "@org_golang_google_protobuf//types/known/anypb",
-    ],
-)

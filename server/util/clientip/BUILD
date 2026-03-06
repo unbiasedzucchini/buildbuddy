@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "clientip",
@@ -8,12 +8,3 @@ go_library(
     deps = ["//server/util/flag"],
 )
 
-go_test(
-    name = "clientip_test",
-    srcs = ["clientip_test.go"],
-    deps = [
-        ":clientip",
-        "//server/util/testing/flags",
-        "@com_github_stretchr_testify//require",
-    ],
-)

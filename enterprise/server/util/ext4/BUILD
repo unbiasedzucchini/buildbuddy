@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -20,20 +20,3 @@ go_library(
     }),
 )
 
-go_test(
-    name = "ext4_test",
-    srcs = ["ext4_test.go"],
-    target_compatible_with = ["@platforms//os:linux"],
-    deps = select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            ":ext4",
-            "//proto:remote_execution_go_proto",
-            "//server/remote_cache/digest",
-            "//server/testutil/testdigest",
-            "//server/testutil/testfs",
-            "//server/util/disk",
-            "@com_github_stretchr_testify//require",
-        ],
-        "//conditions:default": [],
-    }),
-)

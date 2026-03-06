@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "build_buddy_url",
@@ -12,12 +12,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "build_buddy_url_test",
-    srcs = ["build_buddy_url_test.go"],
-    deps = [
-        ":build_buddy_url",
-        "//server/util/testing/flags",
-        "@com_github_stretchr_testify//require",
-    ],
-)

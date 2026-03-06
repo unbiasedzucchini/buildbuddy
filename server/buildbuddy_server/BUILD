@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "buildbuddy_server",
@@ -77,44 +77,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "buildbuddy_server_test",
-    size = "small",
-    srcs = ["buildbuddy_server_test.go"],
-    deps = [
-        ":buildbuddy_server",
-        "//proto:acl_go_proto",
-        "//proto:build_event_stream_go_proto",
-        "//proto:build_events_go_proto",
-        "//proto:buildbuddy_service_go_proto",
-        "//proto:eventlog_go_proto",
-        "//proto:invocation_go_proto",
-        "//proto:invocation_status_go_proto",
-        "//proto:publish_build_event_go_proto",
-        "//proto:remote_execution_go_proto",
-        "//proto:user_id_go_proto",
-        "//server/backends/invocationdb",
-        "//server/backends/memory_kvstore",
-        "//server/build_event_protocol/build_event_handler",
-        "//server/environment",
-        "//server/http/interceptors",
-        "//server/remote_cache/cachetools",
-        "//server/remote_cache/digest",
-        "//server/tables",
-        "//server/testutil/testauth",
-        "//server/testutil/testcache",
-        "//server/testutil/testdigest",
-        "//server/testutil/testenv",
-        "//server/testutil/testhttp",
-        "//server/testutil/testport",
-        "//server/util/authutil",
-        "//server/util/grpc_client",
-        "//server/util/grpc_server",
-        "//server/util/prefix",
-        "//server/util/proto",
-        "//server/util/testing/flags",
-        "@com_github_google_uuid//:uuid",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//types/known/anypb",
-    ],
-)

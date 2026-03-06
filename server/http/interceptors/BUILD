@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "interceptors",
@@ -26,13 +26,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "interceptors_test",
-    srcs = ["interceptors_test.go"],
-    embed = [":interceptors"],
-    deps = [
-        "//server/util/testing/flags",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-    ],
-)

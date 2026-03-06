@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "fileresolver",
@@ -11,16 +11,3 @@ go_library(
     deps = ["@io_bazel_rules_go//go/runfiles"],
 )
 
-go_test(
-    name = "fileresolver_test",
-    size = "small",
-    srcs = ["fileresolver_test.go"],
-    data = [
-        "//server/util/fileresolver/test_data:runfiles",
-    ],
-    deps = [
-        ":fileresolver",
-        "//server/util/fileresolver/test_data:bundle",
-        "@com_github_stretchr_testify//require",
-    ],
-)

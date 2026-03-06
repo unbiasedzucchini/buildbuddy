@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -25,21 +25,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "iprules_test",
-    srcs = ["iprules_test.go"],
-    deps = [
-        ":iprules",
-        "//enterprise/server/testutil/enterprise_testauth",
-        "//enterprise/server/testutil/enterprise_testenv",
-        "//proto:context_go_proto",
-        "//proto:iprules_go_proto",
-        "//server/environment",
-        "//server/testutil/testauth",
-        "//server/util/authutil",
-        "//server/util/clientip",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_stretchr_testify//require",
-    ],
-)

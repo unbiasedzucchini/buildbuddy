@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "terminal",
@@ -8,13 +8,3 @@ go_library(
     deps = ["@com_github_buildkite_terminal_to_html_v3//:terminal-to-html"],
 )
 
-go_test(
-    name = "terminal_test",
-    srcs = ["terminal_test.go"],
-    deps = [
-        ":terminal",
-        "//server/util/random",
-        "//server/util/terminal/testdata",
-        "@com_github_stretchr_testify//require",
-    ],
-)

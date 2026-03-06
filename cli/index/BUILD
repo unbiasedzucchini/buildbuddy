@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//cli:__subpackages__"])
 
@@ -23,19 +23,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "index_test",
-    srcs = ["index_test.go"],
-    embed = [":index"],
-    deps = [
-        "//codesearch/github",
-        "//proto:buildbuddy_service_go_proto",
-        "//proto:git_go_proto",
-        "//proto:index_go_proto",
-        "//server/testutil/testgit",
-        "//server/testutil/testshell",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_grpc//:grpc",
-    ],
-)

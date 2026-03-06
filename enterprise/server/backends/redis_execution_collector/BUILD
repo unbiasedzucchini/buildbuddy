@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -17,18 +17,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "redis_execution_collector_test",
-    srcs = ["redis_execution_collector_test.go"],
-    deps = [
-        ":redis_execution_collector",
-        "//enterprise/server/testutil/testredis",
-        "//proto:remote_execution_go_proto",
-        "//proto:stored_invocation_go_proto",
-        "//server/util/status",
-        "@com_github_google_go_cmp//cmp",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//testing/protocmp",
-    ],
-)

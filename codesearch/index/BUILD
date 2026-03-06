@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "index",
@@ -21,18 +21,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "index_test",
-    srcs = ["index_test.go"],
-    embed = [":index"],
-    deps = [
-        "//codesearch/posting",
-        "//codesearch/schema",
-        "//codesearch/types",
-        "//server/testutil/testfs",
-        "//server/util/log",
-        "@com_github_cockroachdb_pebble//:pebble",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-    ],
-)

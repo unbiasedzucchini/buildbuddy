@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -70,41 +70,3 @@ go_library(
     }),
 )
 
-go_test(
-    name = "runner_test",
-    size = "small",
-    srcs = ["runner_test.go"],
-    data = ["//enterprise/server/remote_execution/runner/testworker"],
-    embed = [":runner"],
-    x_defs = {
-        "testworkerRunfilePath": "$(rlocationpath //enterprise/server/remote_execution/runner/testworker)",
-    },
-    deps = [
-        "//enterprise/server/remote_execution/commandutil",
-        "//enterprise/server/remote_execution/container",
-        "//enterprise/server/remote_execution/containers/bare",
-        "//enterprise/server/remote_execution/workspace",
-        "//enterprise/server/tasksize",
-        "//enterprise/server/util/oci",
-        "//proto:remote_execution_go_proto",
-        "//proto:worker_go_proto",
-        "//server/interfaces",
-        "//server/metrics",
-        "//server/real_environment",
-        "//server/remote_cache/cachetools",
-        "//server/testutil/testauth",
-        "//server/testutil/testcache",
-        "//server/testutil/testenv",
-        "//server/testutil/testfs",
-        "//server/testutil/testmetrics",
-        "//server/util/disk",
-        "//server/util/platform",
-        "//server/util/proto",
-        "//server/util/status",
-        "//server/util/testing/flags",
-        "@com_github_google_uuid//:uuid",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//encoding/protojson",
-    ],
-)

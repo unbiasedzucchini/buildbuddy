@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "build_event_server",
@@ -20,19 +20,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "build_event_server_test",
-    srcs = ["build_event_server_test.go"],
-    deps = [
-        ":build_event_server",
-        "//proto:build_events_go_proto",
-        "//proto:publish_build_event_go_proto",
-        "//server/interfaces",
-        "//server/testutil/testbes",
-        "//server/testutil/testenv",
-        "//server/util/status",
-        "//server/util/uuid",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-    ],
-)

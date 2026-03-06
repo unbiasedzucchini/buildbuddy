@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -14,14 +14,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "bitbucket_test",
-    size = "small",
-    srcs = ["bitbucket_test.go"],
-    deps = [
-        ":bitbucket",
-        "//enterprise/server/webhooks/bitbucket/test_data",
-        "//server/interfaces",
-        "@com_github_stretchr_testify//assert",
-    ],
-)

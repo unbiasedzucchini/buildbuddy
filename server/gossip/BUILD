@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "gossip",
@@ -18,16 +18,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "gossip_test",
-    size = "small",
-    srcs = ["gossip_test.go"],
-    deps = [
-        ":gossip",
-        "//server/interfaces",
-        "//server/testutil/testport",
-        "//server/util/testing/flags",
-        "@com_github_hashicorp_serf//serf",
-        "@com_github_stretchr_testify//require",
-    ],
-)

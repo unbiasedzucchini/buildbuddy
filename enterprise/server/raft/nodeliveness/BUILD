@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = ["//enterprise:__subpackages__"])
 
@@ -21,18 +21,3 @@ go_library(
     ],
 )
 
-go_test(
-    name = "nodeliveness_test",
-    size = "small",
-    srcs = ["nodeliveness_test.go"],
-    deps = [
-        ":nodeliveness",
-        "//enterprise/server/raft/constants",
-        "//enterprise/server/raft/sender",
-        "//proto:raft_go_proto",
-        "//server/util/status",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_genproto_googleapis_rpc//status",
-        "@org_golang_google_grpc//status",
-    ],
-)

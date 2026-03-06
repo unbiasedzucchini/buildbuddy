@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"runtime"
 	"testing"
 	"time"
 
@@ -27,6 +28,12 @@ type stream[T any] struct {
 	closeRecvCh chan message[T]
 }
 
+type blockingSendStream[T any] struct {
+	ctx          context.Context
+	sendStarted  chan struct{}
+	sendReturned chan struct{}
+}
+
 func (s *stream[T]) Recv() (T, error) {
 	var zero T
 	msg, ok := <-s.ch
@@ -46,6 +53,18 @@ func (s *stream[T]) CloseAndRecv() (T, error) {
 		msg := <-s.closeRecvCh
 		return msg.Val, msg.Err
 	}
+	var zero T
+	return zero, nil
+}
+
+func (s *blockingSendStream[T]) Send(T) error {
+	close(s.sendStarted)
+	<-s.ctx.Done()
+	close(s.sendReturned)
+	return s.ctx.Err()
+}
+
+func (s *blockingSendStream[T]) CloseAndRecv() (T, error) {
 	var zero T
 	return zero, nil
 }
@@ -107,4 +126,39 @@ func TestCloseAndRecv(t *testing.T) {
 
 	// Unblock CloseAndRecv goroutine to avoid leaking it in the timeout case.
 	close(closeRecvChTimeout)
+}
+
+func TestSender_SendTimeoutDoesNotLeakAfterCancel(t *testing.T) {
+	const iterations = 25
+	baseline := runtime.NumGoroutine()
+
+	for i := 0; i < iterations; i++ {
+		ctx, cancel := context.WithCancel(context.Background())
+		stream := &blockingSendStream[*tspb.Timestamp]{
+			ctx:          ctx,
+			sendStarted:  make(chan struct{}),
+			sendReturned: make(chan struct{}),
+		}
+		sender := rpcutil.NewSender(ctx, stream)
+
+		err := sender.SendWithTimeoutCause(tspb.Now(), time.Millisecond, fmt.Errorf("test-cause"))
+		require.Error(t, err)
+		select {
+		case <-stream.sendStarted:
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for sender goroutine to start Send")
+		}
+
+		cancel()
+		select {
+		case <-stream.sendReturned:
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for blocked send to return")
+		}
+	}
+
+	require.Eventually(t, func() bool {
+		runtime.GC()
+		return runtime.NumGoroutine() <= baseline+5
+	}, time.Second, 10*time.Millisecond)
 }

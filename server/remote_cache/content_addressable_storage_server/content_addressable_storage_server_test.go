@@ -321,6 +321,103 @@ func TestBatchUpdateRejectCorruptBlobs(t *testing.T) {
 	assert.Equal(t, int32(gcodes.OK), rsp.GetResponses()[2].GetStatus().GetCode())
 }
 
+func TestBatchUpdateAndReadRejectInvalidDigestResources(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+
+	clientConn := runCASServer(ctx, t, te)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	for _, tc := range []struct {
+		name   string
+		digest *repb.Digest
+	}{
+		{
+			name:   "short hash",
+			digest: &repb.Digest{Hash: "abc", SizeBytes: 3},
+		},
+		{
+			name:   "negative size",
+			digest: &repb.Digest{Hash: strings.Repeat("a", 64), SizeBytes: -1},
+		},
+		{
+			name:   "non hex hash",
+			digest: &repb.Digest{Hash: strings.Repeat("z", 64), SizeBytes: 1},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{
+				Requests: []*repb.BatchUpdateBlobsRequest_Request{
+					{Digest: tc.digest, Data: []byte("abc")},
+				},
+				DigestFunction: repb.DigestFunction_SHA256,
+			})
+			require.Error(t, err)
+			require.True(t, status.IsInvalidArgumentError(err), "expected InvalidArgumentError, got: %v", err)
+
+			_, err = casClient.BatchReadBlobs(ctx, &repb.BatchReadBlobsRequest{
+				Digests:        []*repb.Digest{tc.digest},
+				DigestFunction: repb.DigestFunction_SHA256,
+			})
+			require.Error(t, err)
+			require.True(t, status.IsInvalidArgumentError(err), "expected InvalidArgumentError, got: %v", err)
+		})
+	}
+}
+
+func TestCASTenantPrefixIsolation(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	ta := testauth.NewTestAuthenticator(t, testauth.TestUsers("US1", "GR1", "US2", "GR2"))
+	te.SetAuthenticator(ta)
+
+	clientConn := runCASServer(ctx, t, te)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	blob := []byte("tenant-scoped blob")
+	d, err := digest.Compute(bytes.NewReader(blob), repb.DigestFunction_SHA256)
+	require.NoError(t, err)
+
+	user1Ctx, err := ta.WithAuthenticatedUser(ctx, "US1")
+	require.NoError(t, err)
+	user2Ctx, err := ta.WithAuthenticatedUser(ctx, "US2")
+	require.NoError(t, err)
+
+	_, err = casClient.BatchUpdateBlobs(user1Ctx, &repb.BatchUpdateBlobsRequest{
+		Requests: []*repb.BatchUpdateBlobsRequest_Request{
+			{Digest: d, Data: blob},
+		},
+	})
+	require.NoError(t, err)
+
+	missingForUser1, err := casClient.FindMissingBlobs(user1Ctx, &repb.FindMissingBlobsRequest{
+		BlobDigests: []*repb.Digest{d},
+	})
+	require.NoError(t, err)
+	require.Empty(t, missingForUser1.GetMissingBlobDigests())
+
+	missingForUser2, err := casClient.FindMissingBlobs(user2Ctx, &repb.FindMissingBlobsRequest{
+		BlobDigests: []*repb.Digest{d},
+	})
+	require.NoError(t, err)
+	require.Equal(t, digestStrings(d), digestStrings(missingForUser2.GetMissingBlobDigests()...))
+
+	readForUser2, err := casClient.BatchReadBlobs(user2Ctx, &repb.BatchReadBlobsRequest{
+		Digests: []*repb.Digest{d},
+	})
+	require.NoError(t, err)
+	require.Len(t, readForUser2.GetResponses(), 1)
+	require.Equal(t, int32(gcodes.NotFound), readForUser2.GetResponses()[0].GetStatus().GetCode())
+
+	readForUser1, err := casClient.BatchReadBlobs(user1Ctx, &repb.BatchReadBlobsRequest{
+		Digests: []*repb.Digest{d},
+	})
+	require.NoError(t, err)
+	require.Len(t, readForUser1.GetResponses(), 1)
+	require.Equal(t, int32(gcodes.OK), readForUser1.GetResponses()[0].GetStatus().GetCode())
+	require.Equal(t, blob, readForUser1.GetResponses()[0].GetData())
+}
+
 func TestBatchUpdateAndRead_CacheHandlesCompression(t *testing.T) {
 	blob := []byte("AAAAAAAAAAAAAAAAAAAAAAAAA")
 	compressedBlob := compression.CompressZstd(nil, blob)
@@ -1078,6 +1175,57 @@ func TestSpliceBlobSingleChunk(t *testing.T) {
 	_, err = casClient.SpliceBlob(ctx, spliceReq)
 	require.Error(t, err)
 	require.True(t, status.IsUnimplementedError(err), "expected UnimplementedError, got: %v", err)
+}
+
+func TestSpliceBlobRejectsReorderedChunks(t *testing.T) {
+	testProvider := memprovider.NewInMemoryProvider(map[string]memprovider.InMemoryFlag{
+		"cache.chunking_enabled": {
+			State:          memprovider.Enabled,
+			DefaultVariant: "true",
+			Variants: map[string]any{
+				"true":  true,
+				"false": false,
+			},
+		},
+	})
+	require.NoError(t, openfeature.SetNamedProviderAndWait(t.Name(), testProvider))
+
+	fp, err := experiments.NewFlagProvider(t.Name())
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	te.SetExperimentFlagProvider(fp)
+
+	clientConn := runCASServer(ctx, t, te)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	chunk1 := []byte("chunk-one")
+	chunk2 := []byte("chunk-two")
+	chunk1Digest, err := digest.Compute(bytes.NewReader(chunk1), repb.DigestFunction_BLAKE3)
+	require.NoError(t, err)
+	chunk2Digest, err := digest.Compute(bytes.NewReader(chunk2), repb.DigestFunction_BLAKE3)
+	require.NoError(t, err)
+
+	_, err = casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{
+		Requests: []*repb.BatchUpdateBlobsRequest_Request{
+			{Digest: chunk1Digest, Data: chunk1},
+			{Digest: chunk2Digest, Data: chunk2},
+		},
+		DigestFunction: repb.DigestFunction_BLAKE3,
+	})
+	require.NoError(t, err)
+
+	blobDigest, err := digest.Compute(bytes.NewReader(append(append([]byte{}, chunk1...), chunk2...)), repb.DigestFunction_BLAKE3)
+	require.NoError(t, err)
+
+	_, err = casClient.SpliceBlob(ctx, &repb.SpliceBlobRequest{
+		BlobDigest:     blobDigest,
+		ChunkDigests:   []*repb.Digest{chunk2Digest, chunk1Digest},
+		DigestFunction: repb.DigestFunction_BLAKE3,
+	})
+	require.Error(t, err)
+	require.True(t, status.IsInvalidArgumentError(err), "expected InvalidArgumentError, got: %v", err)
 }
 
 func TestFindMissingBlobsWithChunkedBlob(t *testing.T) {

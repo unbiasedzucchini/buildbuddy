@@ -477,6 +477,96 @@ func TestBatchReadBlobsPreservesDuplicateAndMissingResponses(t *testing.T) {
 	require.Equal(t, blob, readResp.GetResponses()[2].GetData())
 }
 
+func TestBatchUpdateFindMissingBatchReadStateMachine(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+
+	clientConn := runCASServer(ctx, t, te)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	digestFn := repb.DigestFunction_SHA256
+	blobs := [][]byte{
+		[]byte("blob-0"),
+		[]byte("blob-1"),
+		[]byte("blob-2"),
+		[]byte("blob-3"),
+		[]byte("blob-4"),
+		[]byte("blob-5"),
+		[]byte("blob-6"),
+		[]byte("blob-7"),
+	}
+	digests := make([]*repb.Digest, 0, len(blobs))
+	blobByDigest := map[string][]byte{}
+	for _, blob := range blobs {
+		d, err := digest.Compute(bytes.NewReader(blob), digestFn)
+		require.NoError(t, err)
+		digests = append(digests, d)
+		blobByDigest[fmt.Sprintf("%s/%d", d.GetHash(), d.GetSizeBytes())] = blob
+	}
+	missingA, err := digest.Compute(bytes.NewReader([]byte("missing-a")), digestFn)
+	require.NoError(t, err)
+	missingB, err := digest.Compute(bytes.NewReader([]byte("missing-b")), digestFn)
+	require.NoError(t, err)
+
+	uploadOrder := []int{4, 1, 4, 7, 0, 2, 7}
+	uploaded := map[string]bool{}
+	updateReq := &repb.BatchUpdateBlobsRequest{}
+	for _, index := range uploadOrder {
+		d := digests[index]
+		updateReq.Requests = append(updateReq.Requests, &repb.BatchUpdateBlobsRequest_Request{
+			Digest: d,
+			Data:   blobByDigest[fmt.Sprintf("%s/%d", d.GetHash(), d.GetSizeBytes())],
+		})
+		uploaded[fmt.Sprintf("%s/%d", d.GetHash(), d.GetSizeBytes())] = true
+	}
+	updateResp, err := casClient.BatchUpdateBlobs(ctx, updateReq)
+	require.NoError(t, err)
+	require.Len(t, updateResp.GetResponses(), len(updateReq.GetRequests()))
+	var expectedUpdateDigests []*repb.Digest
+	var actualUpdateDigests []*repb.Digest
+	for _, req := range updateReq.GetRequests() {
+		expectedUpdateDigests = append(expectedUpdateDigests, req.GetDigest())
+	}
+	for _, resp := range updateResp.GetResponses() {
+		actualUpdateDigests = append(actualUpdateDigests, resp.GetDigest())
+		require.Equal(t, int32(gcodes.OK), resp.GetStatus().GetCode())
+	}
+	assert.ElementsMatch(t, digestStrings(expectedUpdateDigests...), digestStrings(actualUpdateDigests...))
+
+	findQuery := append(append([]*repb.Digest{}, digests...), missingA, missingB)
+	missingResp, err := casClient.FindMissingBlobs(ctx, &repb.FindMissingBlobsRequest{
+		BlobDigests: findQuery,
+	})
+	require.NoError(t, err)
+	var expectedMissing []*repb.Digest
+	for _, d := range findQuery {
+		if !uploaded[fmt.Sprintf("%s/%d", d.GetHash(), d.GetSizeBytes())] {
+			expectedMissing = append(expectedMissing, d)
+		}
+	}
+	assert.ElementsMatch(t, digestStrings(expectedMissing...), digestStrings(missingResp.GetMissingBlobDigests()...))
+
+	readQuery := []*repb.Digest{digests[4], digests[3], missingA, digests[4], digests[1], digests[6], missingB, digests[7]}
+	readResp, err := casClient.BatchReadBlobs(ctx, &repb.BatchReadBlobsRequest{
+		Digests: readQuery,
+	})
+	require.NoError(t, err)
+	require.Len(t, readResp.GetResponses(), len(readQuery))
+	for i, resp := range readResp.GetResponses() {
+		requested := readQuery[i]
+		require.Equal(t, requested.GetHash(), resp.GetDigest().GetHash())
+		require.Equal(t, requested.GetSizeBytes(), resp.GetDigest().GetSizeBytes())
+		key := fmt.Sprintf("%s/%d", requested.GetHash(), requested.GetSizeBytes())
+		if uploaded[key] {
+			require.Equal(t, int32(gcodes.OK), resp.GetStatus().GetCode())
+			require.Equal(t, blobByDigest[key], resp.GetData())
+			continue
+		}
+		require.Equal(t, int32(gcodes.NotFound), resp.GetStatus().GetCode())
+		require.Empty(t, resp.GetData())
+	}
+}
+
 func TestByteStreamWriteIsVisibleToCAS(t *testing.T) {
 	ctx := context.Background()
 	te := testenv.GetTestEnv(t)

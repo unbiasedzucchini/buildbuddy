@@ -279,6 +279,27 @@ func TestBatchUpdateRejectsCompressedBlobsIfCompressionDisabled(t *testing.T) {
 	}
 }
 
+func TestBatchUpdateRejectsCorruptCompressedBlob(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	flags.Set(t, "cache.zstd_transcoding_enabled", true)
+	clientConn := runCASServer(ctx, t, te)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	blob := []byte("uncompressed digest contents")
+	d, err := digest.Compute(bytes.NewReader(blob), repb.DigestFunction_SHA256)
+	require.NoError(t, err)
+
+	rsp, err := casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{
+		Requests: []*repb.BatchUpdateBlobsRequest_Request{
+			{Digest: d, Data: []byte("not a zstd frame"), Compressor: repb.Compressor_ZSTD},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, rsp.GetResponses(), 1)
+	require.Equal(t, int32(gcodes.Internal), rsp.GetResponses()[0].GetStatus().GetCode())
+}
+
 func TestBatchUpdateRejectCorruptBlobs(t *testing.T) {
 	ctx := context.Background()
 	te := testenv.GetTestEnv(t)
@@ -621,6 +642,82 @@ func TestGetTree(t *testing.T) {
 	allFiles = append(allFiles, "child1", "child2")
 	treeFiles := cas.ReadTree(ctx, t, casClient, instanceName, rootDigest)
 	assert.ElementsMatch(t, allFiles, treeFiles)
+}
+
+func TestGetTreeRejectsMissingRootDigest(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+
+	clientConn := runCASServer(ctx, t, te)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	stream, err := casClient.GetTree(ctx, &repb.GetTreeRequest{})
+	require.NoError(t, err)
+
+	_, err = stream.Recv()
+	require.Error(t, err)
+	require.Equal(t, gcodes.InvalidArgument, gstatus.Code(err))
+}
+
+func TestGetTreeRejectsMalformedRootDirectory(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	ctx, err := prefix.AttachUserPrefixToContext(ctx, te.GetAuthenticator())
+	require.NoError(t, err)
+
+	clientConn := runCASServer(ctx, t, te)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	malformed := []byte{0xff}
+	rootDigest, err := digest.Compute(bytes.NewReader(malformed), repb.DigestFunction_SHA256)
+	require.NoError(t, err)
+	rootRN := digest.NewCASResourceName(rootDigest, "", repb.DigestFunction_SHA256)
+	require.NoError(t, te.GetCache().Set(ctx, rootRN.ToProto(), malformed))
+
+	stream, err := casClient.GetTree(ctx, &repb.GetTreeRequest{
+		RootDigest: rootDigest,
+	})
+	require.NoError(t, err)
+
+	_, err = stream.Recv()
+	require.Error(t, err)
+}
+
+func TestGetTreeMissingChildDirectory(t *testing.T) {
+	instanceName := ""
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	ctx, err := prefix.AttachUserPrefixToContext(ctx, te.GetAuthenticator())
+	require.NoError(t, err)
+
+	clientConn := runCASServer(ctx, t, te)
+	bsClient := bspb.NewByteStreamClient(clientConn)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	missingChildDigest := &repb.Digest{
+		Hash:      strings.Repeat("b", 64),
+		SizeBytes: 123,
+	}
+	rootDir := &repb.Directory{
+		Directories: []*repb.DirectoryNode{
+			{
+				Name:   "missing-child",
+				Digest: missingChildDigest,
+			},
+		},
+	}
+	rootDigest, err := cachetools.UploadProto(ctx, bsClient, instanceName, repb.DigestFunction_SHA256, rootDir)
+	require.NoError(t, err)
+
+	stream, err := casClient.GetTree(ctx, &repb.GetTreeRequest{
+		InstanceName: instanceName,
+		RootDigest:   rootDigest,
+	})
+	require.NoError(t, err)
+
+	_, err = stream.Recv()
+	require.Error(t, err)
+	require.True(t, hasMissingDigestError(err), "expected missing digest details, got: %v", err)
 }
 
 func TestGetTreeCaching(t *testing.T) {

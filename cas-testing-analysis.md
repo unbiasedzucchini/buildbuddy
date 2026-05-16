@@ -37,7 +37,8 @@ The first deterministic slice should live in `server/remote_cache/content_addres
 - invalid digest rejection for `BatchUpdateBlobs` and `BatchReadBlobs`
 - authenticated tenant prefix isolation for `FindMissingBlobs`, `BatchUpdateBlobs`, and `BatchReadBlobs`
 - `SpliceBlob` validation for reordered chunks
-- later follow-up tests for malformed `GetTree` directories and broader compression matrices
+- corrupt zstd upload handling
+- `GetTree` handling for missing root digests, malformed root directory blobs, and missing child directories
 
 Use Bazel for verification:
 

@@ -591,6 +591,67 @@ func TestActionCacheTenantPrefixIsolation(t *testing.T) {
 	require.True(t, status.IsNotFoundError(err), "expected NotFound, got %T: %s", err, err)
 }
 
+func TestGetActionResultOutputDirectoryRequiresReferencedCASBlobs(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	clientConn := runACServer(ctx, t, te)
+	acClient := repb.NewActionCacheClient(clientConn)
+	bsClient := bspb.NewByteStreamClient(clientConn)
+
+	instanceName := "test"
+	digestFn := repb.DigestFunction_SHA256
+	actionDigest := &repb.Digest{Hash: strings.Repeat("f", 64), SizeBytes: 1}
+	output := []byte("tree output")
+	outputDigest, err := digest.Compute(bytes.NewReader(output), digestFn)
+	require.NoError(t, err)
+	tree := &repb.Tree{
+		Root: &repb.Directory{
+			Files: []*repb.FileNode{{
+				Name:   "nested.txt",
+				Digest: outputDigest,
+			}},
+		},
+	}
+	treeDigest, err := digest.ComputeForMessage(tree, digestFn)
+	require.NoError(t, err)
+	treeBytes, err := proto.Marshal(tree)
+	require.NoError(t, err)
+	uploadedTreeDigest, err := cachetools.UploadBlobToCAS(ctx, bsClient, instanceName, digestFn, treeBytes)
+	require.NoError(t, err)
+	require.Equal(t, treeDigest, uploadedTreeDigest)
+	actionResult := &repb.ActionResult{
+		OutputDirectories: []*repb.OutputDirectory{{
+			Path:       "out",
+			TreeDigest: treeDigest,
+		}},
+	}
+
+	_, err = acClient.UpdateActionResult(ctx, &repb.UpdateActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+		ActionResult:   actionResult,
+	})
+	require.NoError(t, err)
+	_, err = acClient.GetActionResult(ctx, &repb.GetActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+	})
+	require.True(t, status.IsNotFoundError(err), "expected NotFound, got %T: %s", err, err)
+
+	uploadedDigest, err := cachetools.UploadBlobToCAS(ctx, bsClient, instanceName, digestFn, output)
+	require.NoError(t, err)
+	require.Equal(t, outputDigest, uploadedDigest)
+	got, err := acClient.GetActionResult(ctx, &repb.GetActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, cmp.Diff(actionResult.GetOutputDirectories(), got.GetOutputDirectories(), protocmp.Transform()))
+}
+
 func update(t *testing.T, ctx context.Context, client repb.ActionCacheClient, outputFiles []*repb.OutputFile) {
 	req := repb.UpdateActionResultRequest{
 		ActionDigest: &repb.Digest{

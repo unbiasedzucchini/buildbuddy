@@ -463,6 +463,90 @@ func TestHitTracking(t *testing.T) {
 	}
 }
 
+func TestGetActionResultRejectsInvalidRequests(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	clientConn := runACServer(ctx, t, te)
+	acClient := repb.NewActionCacheClient(clientConn)
+
+	for _, tc := range []struct {
+		name string
+		req  *repb.GetActionResultRequest
+	}{
+		{
+			name: "missing action digest",
+			req:  &repb.GetActionResultRequest{DigestFunction: repb.DigestFunction_SHA256},
+		},
+		{
+			name: "malformed action digest hash",
+			req: &repb.GetActionResultRequest{
+				DigestFunction: repb.DigestFunction_SHA256,
+				ActionDigest:   &repb.Digest{Hash: "bad", SizeBytes: 1},
+			},
+		},
+		{
+			name: "negative action digest size",
+			req: &repb.GetActionResultRequest{
+				DigestFunction: repb.DigestFunction_SHA256,
+				ActionDigest:   &repb.Digest{Hash: strings.Repeat("a", 64), SizeBytes: -1},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := acClient.GetActionResult(ctx, tc.req)
+			require.True(t, status.IsInvalidArgumentError(err), "expected InvalidArgument, got %T: %s", err, err)
+		})
+	}
+}
+
+func TestUpdateActionResultRejectsInvalidRequests(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	clientConn := runACServer(ctx, t, te)
+	acClient := repb.NewActionCacheClient(clientConn)
+
+	for _, tc := range []struct {
+		name string
+		req  *repb.UpdateActionResultRequest
+	}{
+		{
+			name: "missing action digest",
+			req: &repb.UpdateActionResultRequest{
+				DigestFunction: repb.DigestFunction_SHA256,
+				ActionResult:   &repb.ActionResult{},
+			},
+		},
+		{
+			name: "missing action result",
+			req: &repb.UpdateActionResultRequest{
+				DigestFunction: repb.DigestFunction_SHA256,
+				ActionDigest:   &repb.Digest{Hash: strings.Repeat("a", 64), SizeBytes: 1},
+			},
+		},
+		{
+			name: "malformed action digest hash",
+			req: &repb.UpdateActionResultRequest{
+				DigestFunction: repb.DigestFunction_SHA256,
+				ActionDigest:   &repb.Digest{Hash: "bad", SizeBytes: 1},
+				ActionResult:   &repb.ActionResult{},
+			},
+		},
+		{
+			name: "negative action digest size",
+			req: &repb.UpdateActionResultRequest{
+				DigestFunction: repb.DigestFunction_SHA256,
+				ActionDigest:   &repb.Digest{Hash: strings.Repeat("a", 64), SizeBytes: -1},
+				ActionResult:   &repb.ActionResult{},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := acClient.UpdateActionResult(ctx, tc.req)
+			require.True(t, status.IsInvalidArgumentError(err), "expected InvalidArgument, got %T: %s", err, err)
+		})
+	}
+}
+
 func TestGetActionResultReturnsNotFoundWhenReferencedCASBlobMissing(t *testing.T) {
 	ctx := context.Background()
 	te := testenv.GetTestEnv(t)

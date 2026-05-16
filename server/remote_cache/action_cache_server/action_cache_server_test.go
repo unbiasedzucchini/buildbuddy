@@ -17,6 +17,7 @@ import (
 	"github.com/buildbuddy-io/buildbuddy/server/remote_cache/content_addressable_storage_server"
 	"github.com/buildbuddy-io/buildbuddy/server/remote_cache/digest"
 	"github.com/buildbuddy-io/buildbuddy/server/remote_cache/hit_tracker"
+	"github.com/buildbuddy-io/buildbuddy/server/testutil/testauth"
 	"github.com/buildbuddy-io/buildbuddy/server/testutil/testdigest"
 	"github.com/buildbuddy-io/buildbuddy/server/testutil/testenv"
 	"github.com/buildbuddy-io/buildbuddy/server/testutil/testmetrics"
@@ -460,6 +461,134 @@ func TestHitTracking(t *testing.T) {
 			))
 		})
 	}
+}
+
+func TestGetActionResultReturnsNotFoundWhenReferencedCASBlobMissing(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	clientConn := runACServer(ctx, t, te)
+	acClient := repb.NewActionCacheClient(clientConn)
+
+	instanceName := "test"
+	digestFn := repb.DigestFunction_SHA256
+	actionDigest := &repb.Digest{Hash: strings.Repeat("c", 64), SizeBytes: 1}
+	outputDigest, err := digest.Compute(bytes.NewReader([]byte("missing output")), digestFn)
+	require.NoError(t, err)
+	actionResult := &repb.ActionResult{
+		OutputFiles: []*repb.OutputFile{{
+			Path:   "missing.txt",
+			Digest: outputDigest,
+		}},
+	}
+
+	_, err = acClient.UpdateActionResult(ctx, &repb.UpdateActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+		ActionResult:   actionResult,
+	})
+	require.NoError(t, err)
+
+	_, err = acClient.GetActionResult(ctx, &repb.GetActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+	})
+	require.True(t, status.IsNotFoundError(err), "expected NotFound, got %T: %s", err, err)
+}
+
+func TestGetActionResultSucceedsAfterReferencedCASBlobUploaded(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	clientConn := runACServer(ctx, t, te)
+	acClient := repb.NewActionCacheClient(clientConn)
+	bsClient := bspb.NewByteStreamClient(clientConn)
+
+	instanceName := "test"
+	digestFn := repb.DigestFunction_SHA256
+	actionDigest := &repb.Digest{Hash: strings.Repeat("d", 64), SizeBytes: 1}
+	output := []byte("late output")
+	outputDigest, err := digest.Compute(bytes.NewReader(output), digestFn)
+	require.NoError(t, err)
+	actionResult := &repb.ActionResult{
+		OutputFiles: []*repb.OutputFile{{
+			Path:   "late.txt",
+			Digest: outputDigest,
+		}},
+	}
+
+	_, err = acClient.UpdateActionResult(ctx, &repb.UpdateActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+		ActionResult:   actionResult,
+	})
+	require.NoError(t, err)
+	_, err = acClient.GetActionResult(ctx, &repb.GetActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+	})
+	require.True(t, status.IsNotFoundError(err), "expected NotFound, got %T: %s", err, err)
+
+	uploadedDigest, err := cachetools.UploadBlobToCAS(ctx, bsClient, instanceName, digestFn, output)
+	require.NoError(t, err)
+	require.Equal(t, outputDigest, uploadedDigest)
+	got, err := acClient.GetActionResult(ctx, &repb.GetActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, cmp.Diff(actionResult.GetOutputFiles(), got.GetOutputFiles(), protocmp.Transform()))
+}
+
+func TestActionCacheTenantPrefixIsolation(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	ta := testauth.NewTestAuthenticator(t, testauth.TestUsers("US1", "GR1", "US2", "GR2"))
+	te.SetAuthenticator(ta)
+	clientConn := runACServer(ctx, t, te)
+	acClient := repb.NewActionCacheClient(clientConn)
+	bsClient := bspb.NewByteStreamClient(clientConn)
+
+	user1Ctx, err := ta.WithAuthenticatedUser(ctx, "US1")
+	require.NoError(t, err)
+	user2Ctx, err := ta.WithAuthenticatedUser(ctx, "US2")
+	require.NoError(t, err)
+
+	instanceName := "test"
+	digestFn := repb.DigestFunction_SHA256
+	actionDigest := &repb.Digest{Hash: strings.Repeat("e", 64), SizeBytes: 1}
+	outputDigest, err := cachetools.UploadBlobToCAS(user1Ctx, bsClient, instanceName, digestFn, []byte("private output"))
+	require.NoError(t, err)
+	actionResult := &repb.ActionResult{
+		OutputFiles: []*repb.OutputFile{{
+			Path:   "private.txt",
+			Digest: outputDigest,
+		}},
+	}
+
+	_, err = acClient.UpdateActionResult(user1Ctx, &repb.UpdateActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+		ActionResult:   actionResult,
+	})
+	require.NoError(t, err)
+	_, err = acClient.GetActionResult(user1Ctx, &repb.GetActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+	})
+	require.NoError(t, err)
+
+	_, err = acClient.GetActionResult(user2Ctx, &repb.GetActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+	})
+	require.True(t, status.IsNotFoundError(err), "expected NotFound, got %T: %s", err, err)
 }
 
 func update(t *testing.T, ctx context.Context, client repb.ActionCacheClient, outputFiles []*repb.OutputFile) {

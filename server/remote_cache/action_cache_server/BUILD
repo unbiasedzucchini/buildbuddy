@@ -46,6 +46,7 @@ go_test(
         "//server/remote_cache/content_addressable_storage_server",
         "//server/remote_cache/digest",
         "//server/remote_cache/hit_tracker",
+        "//server/testutil/testauth",
         "//server/testutil/testdigest",
         "//server/testutil/testenv",
         "//server/testutil/testmetrics",

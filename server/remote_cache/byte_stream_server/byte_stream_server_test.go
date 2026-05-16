@@ -311,6 +311,20 @@ func TestRPCWriteWithDirectWrite(t *testing.T) {
 	}
 }
 
+func TestRPCQueryWriteStatusReturnsUnimplemented(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	clientConn := runByteStreamServer(ctx, t, te)
+	bsClient := bspb.NewByteStreamClient(clientConn)
+
+	d, _ := testdigest.NewReader(t, 1000)
+	rn := digest.NewCASResourceName(d, "", repb.DigestFunction_SHA256)
+	_, err := bsClient.QueryWriteStatus(ctx, &bspb.QueryWriteStatusRequest{
+		ResourceName: rn.NewUploadString(),
+	})
+	require.True(t, status.IsUnimplementedError(err), "expected UnimplementedError, got: %v", err)
+}
+
 func TestRPCMalformedWrite(t *testing.T) {
 	ctx := context.Background()
 	te := testenv.GetTestEnv(t)

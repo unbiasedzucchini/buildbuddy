@@ -477,6 +477,109 @@ func TestBatchReadBlobsPreservesDuplicateAndMissingResponses(t *testing.T) {
 	require.Equal(t, blob, readResp.GetResponses()[2].GetData())
 }
 
+func TestByteStreamWriteIsVisibleToCAS(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+
+	clientConn := runCASServer(ctx, t, te)
+	bsClient := bspb.NewByteStreamClient(clientConn)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	blob := []byte("bytestream upload cas read")
+	blobDigest, err := digest.Compute(bytes.NewReader(blob), repb.DigestFunction_SHA256)
+	require.NoError(t, err)
+	rn := digest.NewCASResourceName(blobDigest, "", repb.DigestFunction_SHA256)
+
+	_, _, err = cachetools.UploadFromReader(ctx, bsClient, rn, bytes.NewReader(blob))
+	require.NoError(t, err)
+
+	missingResp, err := casClient.FindMissingBlobs(ctx, &repb.FindMissingBlobsRequest{
+		BlobDigests: []*repb.Digest{blobDigest},
+	})
+	require.NoError(t, err)
+	require.Empty(t, missingResp.GetMissingBlobDigests())
+
+	readResp, err := casClient.BatchReadBlobs(ctx, &repb.BatchReadBlobsRequest{
+		Digests: []*repb.Digest{blobDigest},
+	})
+	require.NoError(t, err)
+	require.Len(t, readResp.GetResponses(), 1)
+	require.Equal(t, int32(gcodes.OK), readResp.GetResponses()[0].GetStatus().GetCode())
+	require.Equal(t, blob, readResp.GetResponses()[0].GetData())
+}
+
+func TestCASUpdateIsVisibleToByteStream(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+
+	clientConn := runCASServer(ctx, t, te)
+	bsClient := bspb.NewByteStreamClient(clientConn)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	blob := []byte("cas update bytestream read")
+	blobDigest, err := digest.Compute(bytes.NewReader(blob), repb.DigestFunction_SHA256)
+	require.NoError(t, err)
+
+	updateResp, err := casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{
+		Requests: []*repb.BatchUpdateBlobsRequest_Request{
+			{Digest: blobDigest, Data: blob},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, updateResp.GetResponses(), 1)
+	require.Equal(t, int32(gcodes.OK), updateResp.GetResponses()[0].GetStatus().GetCode())
+
+	rn := digest.NewCASResourceName(blobDigest, "", repb.DigestFunction_SHA256)
+	var out bytes.Buffer
+	require.NoError(t, cachetools.GetBlob(ctx, bsClient, rn, &out))
+	require.Equal(t, blob, out.Bytes())
+}
+
+func TestByteStreamAndCASTenantPrefixIsolation(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	ta := testauth.NewTestAuthenticator(t, testauth.TestUsers("US1", "GR1", "US2", "GR2"))
+	te.SetAuthenticator(ta)
+
+	clientConn := runCASServer(ctx, t, te)
+	bsClient := bspb.NewByteStreamClient(clientConn)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	user1Ctx, err := ta.WithAuthenticatedUser(ctx, "US1")
+	require.NoError(t, err)
+	user2Ctx, err := ta.WithAuthenticatedUser(ctx, "US2")
+	require.NoError(t, err)
+
+	blob := []byte("bytestream tenant blob")
+	blobDigest, err := digest.Compute(bytes.NewReader(blob), repb.DigestFunction_SHA256)
+	require.NoError(t, err)
+	rn := digest.NewCASResourceName(blobDigest, "", repb.DigestFunction_SHA256)
+
+	_, _, err = cachetools.UploadFromReader(user1Ctx, bsClient, rn, bytes.NewReader(blob))
+	require.NoError(t, err)
+
+	user1MissingResp, err := casClient.FindMissingBlobs(user1Ctx, &repb.FindMissingBlobsRequest{
+		BlobDigests: []*repb.Digest{blobDigest},
+	})
+	require.NoError(t, err)
+	require.Empty(t, user1MissingResp.GetMissingBlobDigests())
+
+	user2MissingResp, err := casClient.FindMissingBlobs(user2Ctx, &repb.FindMissingBlobsRequest{
+		BlobDigests: []*repb.Digest{blobDigest},
+	})
+	require.NoError(t, err)
+	require.Equal(t, digestStrings(blobDigest), digestStrings(user2MissingResp.GetMissingBlobDigests()...))
+
+	var user2Out bytes.Buffer
+	err = cachetools.GetBlob(user2Ctx, bsClient, rn, &user2Out)
+	require.Error(t, err)
+	require.True(t, status.IsFailedPreconditionError(err), "expected FailedPreconditionError, got: %v", err)
+
+	var user1Out bytes.Buffer
+	require.NoError(t, cachetools.GetBlob(user1Ctx, bsClient, rn, &user1Out))
+	require.Equal(t, blob, user1Out.Bytes())
+}
+
 func TestBatchUpdateAndRead_CacheHandlesCompression(t *testing.T) {
 	blob := []byte("AAAAAAAAAAAAAAAAAAAAAAAAA")
 	compressedBlob := compression.CompressZstd(nil, blob)

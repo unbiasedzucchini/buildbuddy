@@ -41,6 +41,7 @@ The first deterministic slice should live in `server/remote_cache/content_addres
 - `GetTree` handling for missing root digests, malformed root directory blobs, and missing child directories
 - duplicate and mixed-missing `BatchReadBlobs` response semantics
 - unsupported chunking-function rejection for `SplitBlob` and `SpliceBlob`
+- ByteStream write/read interoperability with CAS read/write APIs, including authenticated tenant prefixing
 
 Use Bazel for verification:
 

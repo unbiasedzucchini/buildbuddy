@@ -39,6 +39,8 @@ The first deterministic slice should live in `server/remote_cache/content_addres
 - `SpliceBlob` validation for reordered chunks
 - corrupt zstd upload handling
 - `GetTree` handling for missing root digests, malformed root directory blobs, and missing child directories
+- duplicate and mixed-missing `BatchReadBlobs` response semantics
+- unsupported chunking-function rejection for `SplitBlob` and `SpliceBlob`
 
 Use Bazel for verification:
 

@@ -439,6 +439,44 @@ func TestCASTenantPrefixIsolation(t *testing.T) {
 	require.Equal(t, blob, readForUser1.GetResponses()[0].GetData())
 }
 
+func TestBatchReadBlobsPreservesDuplicateAndMissingResponses(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+
+	clientConn := runCASServer(ctx, t, te)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	blob := []byte("duplicate response blob")
+	blobDigest, err := digest.Compute(bytes.NewReader(blob), repb.DigestFunction_SHA256)
+	require.NoError(t, err)
+	missingDigest, err := digest.Compute(bytes.NewReader([]byte("not uploaded")), repb.DigestFunction_SHA256)
+	require.NoError(t, err)
+
+	_, err = casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{
+		Requests: []*repb.BatchUpdateBlobsRequest_Request{
+			{Digest: blobDigest, Data: blob},
+		},
+	})
+	require.NoError(t, err)
+
+	readResp, err := casClient.BatchReadBlobs(ctx, &repb.BatchReadBlobsRequest{
+		Digests: []*repb.Digest{blobDigest, missingDigest, blobDigest},
+	})
+	require.NoError(t, err)
+	require.Len(t, readResp.GetResponses(), 3)
+
+	require.Equal(t, blobDigest.GetHash(), readResp.GetResponses()[0].GetDigest().GetHash())
+	require.Equal(t, int32(gcodes.OK), readResp.GetResponses()[0].GetStatus().GetCode())
+	require.Equal(t, blob, readResp.GetResponses()[0].GetData())
+
+	require.Equal(t, missingDigest.GetHash(), readResp.GetResponses()[1].GetDigest().GetHash())
+	require.Equal(t, int32(gcodes.NotFound), readResp.GetResponses()[1].GetStatus().GetCode())
+
+	require.Equal(t, blobDigest.GetHash(), readResp.GetResponses()[2].GetDigest().GetHash())
+	require.Equal(t, int32(gcodes.OK), readResp.GetResponses()[2].GetStatus().GetCode())
+	require.Equal(t, blob, readResp.GetResponses()[2].GetData())
+}
+
 func TestBatchUpdateAndRead_CacheHandlesCompression(t *testing.T) {
 	blob := []byte("AAAAAAAAAAAAAAAAAAAAAAAAA")
 	compressedBlob := compression.CompressZstd(nil, blob)
@@ -1216,6 +1254,36 @@ func TestSplitBlobNotFound(t *testing.T) {
 	_, err = casClient.SplitBlob(ctx, splitReq)
 	require.Error(t, err)
 	require.True(t, status.IsNotFoundError(err), "expected NotFoundError, got: %v", err)
+}
+
+func TestSplitAndSpliceBlobRejectUnsupportedChunkingFunction(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+
+	clientConn := runCASServer(ctx, t, te)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	blobDigest := &repb.Digest{
+		Hash:      strings.Repeat("a", 64),
+		SizeBytes: 123,
+	}
+
+	_, err := casClient.SplitBlob(ctx, &repb.SplitBlobRequest{
+		BlobDigest:       blobDigest,
+		DigestFunction:   repb.DigestFunction_BLAKE3,
+		ChunkingFunction: repb.ChunkingFunction_REP_MAX_CDC,
+	})
+	require.Error(t, err)
+	require.True(t, status.IsInvalidArgumentError(err), "expected InvalidArgumentError, got: %v", err)
+
+	_, err = casClient.SpliceBlob(ctx, &repb.SpliceBlobRequest{
+		BlobDigest:       blobDigest,
+		ChunkDigests:     []*repb.Digest{{Hash: strings.Repeat("b", 64), SizeBytes: 123}},
+		DigestFunction:   repb.DigestFunction_BLAKE3,
+		ChunkingFunction: repb.ChunkingFunction_REP_MAX_CDC,
+	})
+	require.Error(t, err)
+	require.True(t, status.IsInvalidArgumentError(err), "expected InvalidArgumentError, got: %v", err)
 }
 
 func TestSpliceBlobSingleChunk(t *testing.T) {

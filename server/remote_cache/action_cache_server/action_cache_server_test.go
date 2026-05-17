@@ -469,6 +469,11 @@ func TestGetActionResultRejectsInvalidRequests(t *testing.T) {
 	clientConn := runACServer(ctx, t, te)
 	acClient := repb.NewActionCacheClient(clientConn)
 
+	// TODO(dan): DigestFunction_UNKNOWN (proto zero value) is NOT an invalid argument.
+	// Per REAPI spec: "If digest_function is not specified, the client will be assumed
+	// to use SHA256." So a request with DigestFunction_UNKNOWN and a valid action digest
+	// should return NOT_FOUND (entry absent), not InvalidArgument. The server correctly
+	// returns NOT_FOUND; do not add UNKNOWN to this table.
 	for _, tc := range []struct {
 		name string
 		req  *repb.GetActionResultRequest

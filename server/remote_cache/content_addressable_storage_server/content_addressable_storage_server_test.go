@@ -297,6 +297,11 @@ func TestBatchUpdateRejectsCorruptCompressedBlob(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, rsp.GetResponses(), 1)
+	// TODO(dan): per REAPI spec a client-supplied decompression failure should be
+	// InvalidArgument (the client sent invalid data); the implementation returns Internal
+	// because zstdDecompress wraps the error via status.InternalErrorf before it reaches
+	// the CAS server's own per-entry error path.
+	// require.Equal(t, int32(gcodes.InvalidArgument), rsp.GetResponses()[0].GetStatus().GetCode())
 	// Decompression failure is wrapped as Internal by the cache layer, unlike hash/size
 	// mismatches which reach the CAS server's own validation and return InvalidArgument.
 	require.Equal(t, int32(gcodes.Internal), rsp.GetResponses()[0].GetStatus().GetCode())
@@ -351,6 +356,15 @@ func TestBatchUpdateAndReadRejectInvalidDigestResources(t *testing.T) {
 	clientConn := runCASServer(ctx, t, te)
 	casClient := repb.NewContentAddressableStorageClient(clientConn)
 
+	// TODO(dan): per REAPI spec "Failures are indicated per individual request, not for
+	// the whole call" (BatchUpdateBlobs) and "Every error on individual read will be
+	// returned in the corresponding digest status" (BatchReadBlobs). The spec-correct
+	// behavior would be: top-level RPC succeeds with a per-entry InvalidArgument status.
+	// Example of what the spec-correct assertion would look like:
+	//   rsp, err := casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{...})
+	//   require.NoError(t, err)  // top-level call succeeds
+	//   require.Len(t, rsp.GetResponses(), 1)
+	//   require.Equal(t, int32(gcodes.InvalidArgument), rsp.GetResponses()[0].GetStatus().GetCode())
 	// The server validates digest format before building per-entry responses, so a
 	// malformed digest in any batch entry returns a top-level RPC error rather than
 	// a per-entry error status. See TestBatchUpdateMalformedDigestFailsEntireBatch
@@ -671,6 +685,11 @@ func TestByteStreamAndCASTenantPrefixIsolation(t *testing.T) {
 	var user2Out bytes.Buffer
 	err = cachetools.GetBlob(user2Ctx, bsClient, rn, &user2Out)
 	require.Error(t, err)
+	// TODO(dan): per REAPI spec ByteStream Read for a blob that does not exist should
+	// return NOT_FOUND. The implementation maps cache misses to FailedPrecondition because
+	// the server treats "resource exists but not for this tenant" as a failed precondition
+	// rather than an absence. NOT_FOUND would be more spec-correct.
+	// require.True(t, status.IsNotFoundError(err), "expected NotFoundError, got: %v", err)
 	// ByteStream returns FailedPrecondition (not NotFound or PermissionDenied) when
 	// a blob is absent under the requesting tenant's prefix: the resource name is
 	// structurally valid but the precondition (blob present for this tenant) fails.
@@ -940,6 +959,11 @@ func TestGetTreeRejectsMalformedRootDirectory(t *testing.T) {
 
 	_, err = stream.Recv()
 	require.Error(t, err)
+	// TODO(dan): a server-side failure to unmarshal a stored blob should be Internal
+	// (the server encountered an unexpected condition processing a valid request).
+	// The implementation returns Unknown because proto.Unmarshal errors are not wrapped
+	// in a gRPC status before being returned, so gRPC converts them to Unknown on the wire.
+	// require.Equal(t, gcodes.Internal, gstatus.Code(err))
 	// proto.Unmarshal errors are not wrapped in a gRPC status, so gRPC converts
 	// them to Unknown on the wire rather than Internal or InvalidArgument.
 	require.Equal(t, gcodes.Unknown, gstatus.Code(err))
@@ -1603,6 +1627,17 @@ func TestBatchUpdateMalformedDigestFailsEntireBatch(t *testing.T) {
 	validDigest, err := digest.Compute(bytes.NewReader(validBlob), repb.DigestFunction_SHA256)
 	require.NoError(t, err)
 
+	// TODO(dan): per REAPI spec the valid entry should be stored with an OK per-entry
+	// status, and only the malformed entry should receive a per-entry InvalidArgument.
+	// The top-level RPC call should succeed. Spec-correct assertions would look like:
+	//   rsp, err := casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{...})
+	//   require.NoError(t, err)  // top-level call succeeds
+	//   require.Len(t, rsp.GetResponses(), 2)
+	//   // responses are indexed by request order; valid entry is OK, malformed is InvalidArgument
+	//   require.Equal(t, int32(gcodes.OK), rsp.GetResponses()[0].GetStatus().GetCode())
+	//   require.Equal(t, int32(gcodes.InvalidArgument), rsp.GetResponses()[1].GetStatus().GetCode())
+	//   // and the valid entry would be stored:
+	//   require.Empty(t, missingResp.GetMissingBlobDigests(), ...)
 	// A single malformed-format digest in the batch causes a top-level RPC error
 	// (not per-entry errors), because digest validation short-circuits the loop
 	// before any entries are written. Even the valid entry is not stored.

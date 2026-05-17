@@ -673,9 +673,84 @@ func TestActionCacheTenantPrefixIsolation(t *testing.T) {
 		ActionDigest:   actionDigest,
 	})
 	require.True(t, status.IsNotFoundError(err), "expected NotFound, got %T: %s", err, err)
+
+	// User2 can store their own entry under the same digest key independently.
+	user2Output, err := cachetools.UploadBlobToCAS(user2Ctx, bsClient, instanceName, digestFn, []byte("user2 private output"))
+	require.NoError(t, err)
+	user2Result := &repb.ActionResult{
+		OutputFiles: []*repb.OutputFile{{Path: "user2.txt", Digest: user2Output}},
+	}
+	_, err = acClient.UpdateActionResult(user2Ctx, &repb.UpdateActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+		ActionResult:   user2Result,
+	})
+	require.NoError(t, err)
+	got, err := acClient.GetActionResult(user2Ctx, &repb.GetActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, cmp.Diff(user2Result.GetOutputFiles(), got.GetOutputFiles(), protocmp.Transform()))
+
+	// User1's original entry is unaffected by user2's write.
+	got1, err := acClient.GetActionResult(user1Ctx, &repb.GetActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, cmp.Diff(actionResult.GetOutputFiles(), got1.GetOutputFiles(), protocmp.Transform()))
 }
 
-func TestGetActionResultOutputDirectoryRequiresReferencedCASBlobs(t *testing.T) {
+func TestGetActionResultOutputDirectory_FailsWhenLeafBlobMissing(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	clientConn := runACServer(ctx, t, te)
+	acClient := repb.NewActionCacheClient(clientConn)
+	bsClient := bspb.NewByteStreamClient(clientConn)
+
+	instanceName := "test"
+	digestFn := repb.DigestFunction_SHA256
+	actionDigest := &repb.Digest{Hash: strings.Repeat("f", 64), SizeBytes: 1}
+	outputDigest, err := digest.Compute(bytes.NewReader([]byte("tree output")), digestFn)
+	require.NoError(t, err)
+	tree := &repb.Tree{
+		Root: &repb.Directory{
+			Files: []*repb.FileNode{{Name: "nested.txt", Digest: outputDigest}},
+		},
+	}
+	treeDigest, err := digest.ComputeForMessage(tree, digestFn)
+	require.NoError(t, err)
+	treeBytes, err := proto.Marshal(tree)
+	require.NoError(t, err)
+	uploadedTreeDigest, err := cachetools.UploadBlobToCAS(ctx, bsClient, instanceName, digestFn, treeBytes)
+	require.NoError(t, err)
+	require.Equal(t, treeDigest, uploadedTreeDigest)
+
+	_, err = acClient.UpdateActionResult(ctx, &repb.UpdateActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+		ActionResult: &repb.ActionResult{
+			OutputDirectories: []*repb.OutputDirectory{{Path: "out", TreeDigest: treeDigest}},
+		},
+	})
+	require.NoError(t, err)
+
+	// The tree blob is present but its leaf file blob is absent; the AC server
+	// must report NotFound rather than returning a result with a dangling reference.
+	_, err = acClient.GetActionResult(ctx, &repb.GetActionResultRequest{
+		InstanceName:   instanceName,
+		DigestFunction: digestFn,
+		ActionDigest:   actionDigest,
+	})
+	require.True(t, status.IsNotFoundError(err), "expected NotFound, got %T: %s", err, err)
+}
+
+func TestGetActionResultOutputDirectory_SucceedsAfterLeafBlobUploaded(t *testing.T) {
 	ctx := context.Background()
 	te := testenv.GetTestEnv(t)
 	clientConn := runACServer(ctx, t, te)
@@ -690,10 +765,7 @@ func TestGetActionResultOutputDirectoryRequiresReferencedCASBlobs(t *testing.T) 
 	require.NoError(t, err)
 	tree := &repb.Tree{
 		Root: &repb.Directory{
-			Files: []*repb.FileNode{{
-				Name:   "nested.txt",
-				Digest: outputDigest,
-			}},
+			Files: []*repb.FileNode{{Name: "nested.txt", Digest: outputDigest}},
 		},
 	}
 	treeDigest, err := digest.ComputeForMessage(tree, digestFn)
@@ -704,10 +776,7 @@ func TestGetActionResultOutputDirectoryRequiresReferencedCASBlobs(t *testing.T) 
 	require.NoError(t, err)
 	require.Equal(t, treeDigest, uploadedTreeDigest)
 	actionResult := &repb.ActionResult{
-		OutputDirectories: []*repb.OutputDirectory{{
-			Path:       "out",
-			TreeDigest: treeDigest,
-		}},
+		OutputDirectories: []*repb.OutputDirectory{{Path: "out", TreeDigest: treeDigest}},
 	}
 
 	_, err = acClient.UpdateActionResult(ctx, &repb.UpdateActionResultRequest{
@@ -717,16 +786,11 @@ func TestGetActionResultOutputDirectoryRequiresReferencedCASBlobs(t *testing.T) 
 		ActionResult:   actionResult,
 	})
 	require.NoError(t, err)
-	_, err = acClient.GetActionResult(ctx, &repb.GetActionResultRequest{
-		InstanceName:   instanceName,
-		DigestFunction: digestFn,
-		ActionDigest:   actionDigest,
-	})
-	require.True(t, status.IsNotFoundError(err), "expected NotFound, got %T: %s", err, err)
 
 	uploadedDigest, err := cachetools.UploadBlobToCAS(ctx, bsClient, instanceName, digestFn, output)
 	require.NoError(t, err)
 	require.Equal(t, outputDigest, uploadedDigest)
+
 	got, err := acClient.GetActionResult(ctx, &repb.GetActionResultRequest{
 		InstanceName:   instanceName,
 		DigestFunction: digestFn,

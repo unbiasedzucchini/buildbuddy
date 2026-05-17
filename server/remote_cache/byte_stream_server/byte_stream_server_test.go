@@ -319,10 +319,29 @@ func TestRPCQueryWriteStatusReturnsUnimplemented(t *testing.T) {
 
 	d, _ := testdigest.NewReader(t, 1000)
 	rn := digest.NewCASResourceName(d, "", repb.DigestFunction_SHA256)
-	_, err := bsClient.QueryWriteStatus(ctx, &bspb.QueryWriteStatusRequest{
-		ResourceName: rn.NewUploadString(),
-	})
-	require.True(t, status.IsUnimplementedError(err), "expected UnimplementedError, got: %v", err)
+
+	for _, tc := range []struct {
+		name         string
+		resourceName string
+	}{
+		{
+			name:         "valid resource name",
+			resourceName: rn.NewUploadString(),
+		},
+		{
+			name:         "malformed resource name",
+			resourceName: "not-a-valid-resource-name",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := bsClient.QueryWriteStatus(ctx, &bspb.QueryWriteStatusRequest{
+				ResourceName: tc.resourceName,
+			})
+			// Unimplemented must take precedence over any InvalidArgument that
+			// resource-name parsing might otherwise return.
+			require.True(t, status.IsUnimplementedError(err), "expected UnimplementedError, got: %v", err)
+		})
+	}
 }
 
 func TestRPCMalformedWrite(t *testing.T) {

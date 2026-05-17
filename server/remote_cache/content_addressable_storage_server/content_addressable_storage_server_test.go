@@ -297,6 +297,8 @@ func TestBatchUpdateRejectsCorruptCompressedBlob(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, rsp.GetResponses(), 1)
+	// Decompression failure is wrapped as Internal by the cache layer, unlike hash/size
+	// mismatches which reach the CAS server's own validation and return InvalidArgument.
 	require.Equal(t, int32(gcodes.Internal), rsp.GetResponses()[0].GetStatus().GetCode())
 }
 
@@ -349,6 +351,10 @@ func TestBatchUpdateAndReadRejectInvalidDigestResources(t *testing.T) {
 	clientConn := runCASServer(ctx, t, te)
 	casClient := repb.NewContentAddressableStorageClient(clientConn)
 
+	// The server validates digest format before building per-entry responses, so a
+	// malformed digest in any batch entry returns a top-level RPC error rather than
+	// a per-entry error status. See TestBatchUpdateMalformedDigestFailsEntireBatch
+	// for the mixed-batch behavior this implies.
 	for _, tc := range []struct {
 		name   string
 		digest *repb.Digest
@@ -546,7 +552,9 @@ func TestBatchUpdateFindMissingBatchReadStateMachine(t *testing.T) {
 	}
 	assert.ElementsMatch(t, digestStrings(expectedMissing...), digestStrings(missingResp.GetMissingBlobDigests()...))
 
-	readQuery := []*repb.Digest{digests[4], digests[3], missingA, digests[4], digests[1], digests[6], missingB, digests[7]}
+	// Read back a mix of uploaded and not-uploaded blobs (no duplicates; duplicate
+	// response ordering is covered by TestBatchReadBlobsPreservesDuplicateAndMissingResponses).
+	readQuery := []*repb.Digest{digests[4], digests[1], digests[7], digests[0], digests[2], digests[3], missingA, digests[6], missingB}
 	readResp, err := casClient.BatchReadBlobs(ctx, &repb.BatchReadBlobsRequest{
 		Digests: readQuery,
 	})
@@ -663,6 +671,9 @@ func TestByteStreamAndCASTenantPrefixIsolation(t *testing.T) {
 	var user2Out bytes.Buffer
 	err = cachetools.GetBlob(user2Ctx, bsClient, rn, &user2Out)
 	require.Error(t, err)
+	// ByteStream returns FailedPrecondition (not NotFound or PermissionDenied) when
+	// a blob is absent under the requesting tenant's prefix: the resource name is
+	// structurally valid but the precondition (blob present for this tenant) fails.
 	require.True(t, status.IsFailedPreconditionError(err), "expected FailedPreconditionError, got: %v", err)
 
 	var user1Out bytes.Buffer
@@ -831,6 +842,23 @@ func zstdDecompress(t *testing.T, b []byte) []byte {
 	return out
 }
 
+func enableChunkingForTest(t *testing.T) *experiments.FlagProvider {
+	testProvider := memprovider.NewInMemoryProvider(map[string]memprovider.InMemoryFlag{
+		"cache.chunking_enabled": {
+			State:          memprovider.Enabled,
+			DefaultVariant: "true",
+			Variants: map[string]any{
+				"true":  true,
+				"false": false,
+			},
+		},
+	})
+	require.NoError(t, openfeature.SetNamedProviderAndWait(t.Name(), testProvider))
+	fp, err := experiments.NewFlagProvider(t.Name())
+	require.NoError(t, err)
+	return fp
+}
+
 func TestGetTree(t *testing.T) {
 	instanceName := ""
 	ctx := context.Background()
@@ -912,6 +940,9 @@ func TestGetTreeRejectsMalformedRootDirectory(t *testing.T) {
 
 	_, err = stream.Recv()
 	require.Error(t, err)
+	// proto.Unmarshal errors are not wrapped in a gRPC status, so gRPC converts
+	// them to Unknown on the wire rather than Internal or InvalidArgument.
+	require.Equal(t, gcodes.Unknown, gstatus.Code(err))
 }
 
 func TestGetTreeMissingChildDirectory(t *testing.T) {
@@ -1303,26 +1334,13 @@ func TestGetTreeMissingRoot(t *testing.T) {
 }
 
 func TestSpliceAndSplitBlob(t *testing.T) {
-	testProvider := memprovider.NewInMemoryProvider(map[string]memprovider.InMemoryFlag{
-		"cache.chunking_enabled": {
-			State:          memprovider.Enabled,
-			DefaultVariant: "true",
-			Variants: map[string]any{
-				"true":  true,
-				"false": false,
-			},
-		},
-	})
-	require.NoError(t, openfeature.SetNamedProviderAndWait(t.Name(), testProvider))
-
-	fp, err := experiments.NewFlagProvider(t.Name())
-	require.NoError(t, err)
+	fp := enableChunkingForTest(t)
 
 	ctx := context.Background()
 	te := testenv.GetTestEnv(t)
 	te.SetExperimentFlagProvider(fp)
 
-	ctx, err = prefix.AttachUserPrefixToContext(ctx, te.GetAuthenticator())
+	ctx, err := prefix.AttachUserPrefixToContext(ctx, te.GetAuthenticator())
 	require.NoError(t, err)
 
 	clientConn := runCASServer(ctx, t, te)
@@ -1408,26 +1426,13 @@ func TestSpliceAndSplitBlob(t *testing.T) {
 }
 
 func TestSplitBlobNotFound(t *testing.T) {
-	testProvider := memprovider.NewInMemoryProvider(map[string]memprovider.InMemoryFlag{
-		"cache.chunking_enabled": {
-			State:          memprovider.Enabled,
-			DefaultVariant: "true",
-			Variants: map[string]any{
-				"true":  true,
-				"false": false,
-			},
-		},
-	})
-	require.NoError(t, openfeature.SetNamedProviderAndWait(t.Name(), testProvider))
-
-	fp, err := experiments.NewFlagProvider(t.Name())
-	require.NoError(t, err)
+	fp := enableChunkingForTest(t)
 
 	ctx := context.Background()
 	te := testenv.GetTestEnv(t)
 	te.SetExperimentFlagProvider(fp)
 
-	ctx, err = prefix.AttachUserPrefixToContext(ctx, te.GetAuthenticator())
+	ctx, err := prefix.AttachUserPrefixToContext(ctx, te.GetAuthenticator())
 	require.NoError(t, err)
 
 	clientConn := runCASServer(ctx, t, te)
@@ -1480,26 +1485,13 @@ func TestSplitAndSpliceBlobRejectUnsupportedChunkingFunction(t *testing.T) {
 }
 
 func TestSpliceBlobSingleChunk(t *testing.T) {
-	testProvider := memprovider.NewInMemoryProvider(map[string]memprovider.InMemoryFlag{
-		"cache.chunking_enabled": {
-			State:          memprovider.Enabled,
-			DefaultVariant: "true",
-			Variants: map[string]any{
-				"true":  true,
-				"false": false,
-			},
-		},
-	})
-	require.NoError(t, openfeature.SetNamedProviderAndWait(t.Name(), testProvider))
-
-	fp, err := experiments.NewFlagProvider(t.Name())
-	require.NoError(t, err)
+	fp := enableChunkingForTest(t)
 
 	ctx := context.Background()
 	te := testenv.GetTestEnv(t)
 	te.SetExperimentFlagProvider(fp)
 
-	ctx, err = prefix.AttachUserPrefixToContext(ctx, te.GetAuthenticator())
+	ctx, err := prefix.AttachUserPrefixToContext(ctx, te.GetAuthenticator())
 	require.NoError(t, err)
 
 	clientConn := runCASServer(ctx, t, te)
@@ -1536,20 +1528,7 @@ func TestSpliceBlobSingleChunk(t *testing.T) {
 }
 
 func TestSpliceBlobRejectsReorderedChunks(t *testing.T) {
-	testProvider := memprovider.NewInMemoryProvider(map[string]memprovider.InMemoryFlag{
-		"cache.chunking_enabled": {
-			State:          memprovider.Enabled,
-			DefaultVariant: "true",
-			Variants: map[string]any{
-				"true":  true,
-				"false": false,
-			},
-		},
-	})
-	require.NoError(t, openfeature.SetNamedProviderAndWait(t.Name(), testProvider))
-
-	fp, err := experiments.NewFlagProvider(t.Name())
-	require.NoError(t, err)
+	fp := enableChunkingForTest(t)
 
 	ctx := context.Background()
 	te := testenv.GetTestEnv(t)
@@ -1580,6 +1559,108 @@ func TestSpliceBlobRejectsReorderedChunks(t *testing.T) {
 	_, err = casClient.SpliceBlob(ctx, &repb.SpliceBlobRequest{
 		BlobDigest:     blobDigest,
 		ChunkDigests:   []*repb.Digest{chunk2Digest, chunk1Digest},
+		DigestFunction: repb.DigestFunction_BLAKE3,
+	})
+	require.Error(t, err)
+	require.True(t, status.IsInvalidArgumentError(err), "expected InvalidArgumentError, got: %v", err)
+}
+
+func TestBatchUpdateRejectsCompressedBlobWithDigestMismatch(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	flags.Set(t, "cache.zstd_transcoding_enabled", true)
+	clientConn := runCASServer(ctx, t, te)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	// Compress "actual content" but declare the digest of "differ content"
+	// (same length, different hash). The decompression succeeds but the
+	// resulting hash does not match, which is a distinct path from a corrupt
+	// zstd frame (TestBatchUpdateRejectsCorruptCompressedBlob).
+	actualBlob := []byte("actual content")
+	compressedBlob := compression.CompressZstd(nil, actualBlob)
+
+	differentBlob := []byte("differ content") // same length, different hash
+	differentDigest, err := digest.Compute(bytes.NewReader(differentBlob), repb.DigestFunction_SHA256)
+	require.NoError(t, err)
+
+	rsp, err := casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{
+		Requests: []*repb.BatchUpdateBlobsRequest_Request{
+			{Digest: differentDigest, Data: compressedBlob, Compressor: repb.Compressor_ZSTD},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, rsp.GetResponses(), 1)
+	require.Equal(t, int32(gcodes.InvalidArgument), rsp.GetResponses()[0].GetStatus().GetCode())
+}
+
+func TestBatchUpdateMalformedDigestFailsEntireBatch(t *testing.T) {
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	clientConn := runCASServer(ctx, t, te)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	validBlob := []byte("valid blob")
+	validDigest, err := digest.Compute(bytes.NewReader(validBlob), repb.DigestFunction_SHA256)
+	require.NoError(t, err)
+
+	// A single malformed-format digest in the batch causes a top-level RPC error
+	// (not per-entry errors), because digest validation short-circuits the loop
+	// before any entries are written. Even the valid entry is not stored.
+	_, err = casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{
+		Requests: []*repb.BatchUpdateBlobsRequest_Request{
+			{Digest: validDigest, Data: validBlob},
+			{Digest: &repb.Digest{Hash: strings.Repeat("z", 64), SizeBytes: 1}, Data: []byte("x")},
+		},
+		DigestFunction: repb.DigestFunction_SHA256,
+	})
+	require.True(t, status.IsInvalidArgumentError(err), "expected top-level InvalidArgument error, got: %v", err)
+
+	missingResp, err := casClient.FindMissingBlobs(ctx, &repb.FindMissingBlobsRequest{
+		BlobDigests: []*repb.Digest{validDigest},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, missingResp.GetMissingBlobDigests(), "valid entry must not be written when any batch entry has a malformed digest")
+}
+
+func TestSpliceBlobRejectsSubsetChunks(t *testing.T) {
+	fp := enableChunkingForTest(t)
+
+	ctx := context.Background()
+	te := testenv.GetTestEnv(t)
+	te.SetExperimentFlagProvider(fp)
+
+	clientConn := runCASServer(ctx, t, te)
+	casClient := repb.NewContentAddressableStorageClient(clientConn)
+
+	chunk1 := []byte("chunk-alpha")
+	chunk2 := []byte("chunk-beta")
+	chunk3 := []byte("chunk-gamma")
+	chunk1Digest, err := digest.Compute(bytes.NewReader(chunk1), repb.DigestFunction_BLAKE3)
+	require.NoError(t, err)
+	chunk2Digest, err := digest.Compute(bytes.NewReader(chunk2), repb.DigestFunction_BLAKE3)
+	require.NoError(t, err)
+	chunk3Digest, err := digest.Compute(bytes.NewReader(chunk3), repb.DigestFunction_BLAKE3)
+	require.NoError(t, err)
+
+	_, err = casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{
+		Requests: []*repb.BatchUpdateBlobsRequest_Request{
+			{Digest: chunk1Digest, Data: chunk1},
+			{Digest: chunk2Digest, Data: chunk2},
+			{Digest: chunk3Digest, Data: chunk3},
+		},
+		DigestFunction: repb.DigestFunction_BLAKE3,
+	})
+	require.NoError(t, err)
+
+	fullBlob := append(append(append([]byte{}, chunk1...), chunk2...), chunk3...)
+	blobDigest, err := digest.Compute(bytes.NewReader(fullBlob), repb.DigestFunction_BLAKE3)
+	require.NoError(t, err)
+
+	// Providing only 2 of the 3 chunks (omitting chunk3) means the concatenated
+	// data won't match blobDigest, so the server must reject it.
+	_, err = casClient.SpliceBlob(ctx, &repb.SpliceBlobRequest{
+		BlobDigest:     blobDigest,
+		ChunkDigests:   []*repb.Digest{chunk1Digest, chunk2Digest},
 		DigestFunction: repb.DigestFunction_BLAKE3,
 	})
 	require.Error(t, err)

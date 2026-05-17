@@ -279,32 +279,54 @@ func TestBatchUpdateRejectsCompressedBlobsIfCompressionDisabled(t *testing.T) {
 	}
 }
 
-func TestBatchUpdateRejectsCorruptCompressedBlob(t *testing.T) {
+func TestBatchUpdateRejectsInvalidCompressedBlobs(t *testing.T) {
 	ctx := context.Background()
 	te := testenv.GetTestEnv(t)
 	flags.Set(t, "cache.zstd_transcoding_enabled", true)
 	clientConn := runCASServer(ctx, t, te)
 	casClient := repb.NewContentAddressableStorageClient(clientConn)
 
-	blob := []byte("uncompressed digest contents")
-	d, err := digest.Compute(bytes.NewReader(blob), repb.DigestFunction_SHA256)
+	// corrupt frame: garbage bytes paired with a well-formed digest
+	corruptDigest, err := digest.Compute(bytes.NewReader([]byte("any blob")), repb.DigestFunction_SHA256)
 	require.NoError(t, err)
 
-	rsp, err := casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{
-		Requests: []*repb.BatchUpdateBlobsRequest_Request{
-			{Digest: d, Data: []byte("not a zstd frame"), Compressor: repb.Compressor_ZSTD},
-		},
-	})
+	// hash mismatch: valid zstd of "actual content" but declared digest of "differ content"
+	compressedActual := compression.CompressZstd(nil, []byte("actual content"))
+	mismatchDigest, err := digest.Compute(bytes.NewReader([]byte("differ content")), repb.DigestFunction_SHA256)
 	require.NoError(t, err)
-	require.Len(t, rsp.GetResponses(), 1)
-	// TODO(dan): per REAPI spec a client-supplied decompression failure should be
-	// InvalidArgument (the client sent invalid data); the implementation returns Internal
-	// because zstdDecompress wraps the error via status.InternalErrorf before it reaches
-	// the CAS server's own per-entry error path.
-	// require.Equal(t, int32(gcodes.InvalidArgument), rsp.GetResponses()[0].GetStatus().GetCode())
-	// Decompression failure is wrapped as Internal by the cache layer, unlike hash/size
-	// mismatches which reach the CAS server's own validation and return InvalidArgument.
-	require.Equal(t, int32(gcodes.Internal), rsp.GetResponses()[0].GetStatus().GetCode())
+
+	for _, tc := range []struct {
+		name           string
+		data           []byte
+		declaredDigest *repb.Digest
+		expectedCode   gcodes.Code
+	}{
+		{
+			name:           "corrupt zstd frame",
+			data:           []byte("not a zstd frame"),
+			declaredDigest: corruptDigest,
+			// TODO(dan): per REAPI spec a client-supplied decompression failure should be
+			// InvalidArgument; returns Internal because zstdDecompress wraps via InternalErrorf.
+			expectedCode: gcodes.Internal,
+		},
+		{
+			name:           "valid zstd decompresses to wrong hash",
+			data:           compressedActual,
+			declaredDigest: mismatchDigest,
+			expectedCode:   gcodes.InvalidArgument,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rsp, err := casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{
+				Requests: []*repb.BatchUpdateBlobsRequest_Request{
+					{Digest: tc.declaredDigest, Data: tc.data, Compressor: repb.Compressor_ZSTD},
+				},
+			})
+			require.NoError(t, err)
+			require.Len(t, rsp.GetResponses(), 1)
+			require.Equal(t, int32(tc.expectedCode), rsp.GetResponses()[0].GetStatus().GetCode())
+		})
+	}
 }
 
 func TestBatchUpdateRejectCorruptBlobs(t *testing.T) {
@@ -1551,7 +1573,7 @@ func TestSpliceBlobSingleChunk(t *testing.T) {
 	require.True(t, status.IsUnimplementedError(err), "expected UnimplementedError, got: %v", err)
 }
 
-func TestSpliceBlobRejectsReorderedChunks(t *testing.T) {
+func TestSpliceBlobRejectsInvalidChunkSet(t *testing.T) {
 	fp := enableChunkingForTest(t)
 
 	ctx := context.Background()
@@ -1561,60 +1583,52 @@ func TestSpliceBlobRejectsReorderedChunks(t *testing.T) {
 	clientConn := runCASServer(ctx, t, te)
 	casClient := repb.NewContentAddressableStorageClient(clientConn)
 
-	chunk1 := []byte("chunk-one")
-	chunk2 := []byte("chunk-two")
-	chunk1Digest, err := digest.Compute(bytes.NewReader(chunk1), repb.DigestFunction_BLAKE3)
-	require.NoError(t, err)
-	chunk2Digest, err := digest.Compute(bytes.NewReader(chunk2), repb.DigestFunction_BLAKE3)
-	require.NoError(t, err)
-
-	_, err = casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{
-		Requests: []*repb.BatchUpdateBlobsRequest_Request{
-			{Digest: chunk1Digest, Data: chunk1},
-			{Digest: chunk2Digest, Data: chunk2},
+	for _, tc := range []struct {
+		name      string
+		chunks    [][]byte // all chunks in correct order; all are uploaded
+		spliceidx []int    // indices into chunks to pass to SpliceBlob (wrong order or subset)
+	}{
+		{
+			name:      "reordered chunks",
+			chunks:    [][]byte{[]byte("chunk-one"), []byte("chunk-two")},
+			spliceidx: []int{1, 0}, // reversed
 		},
-		DigestFunction: repb.DigestFunction_BLAKE3,
-	})
-	require.NoError(t, err)
-
-	blobDigest, err := digest.Compute(bytes.NewReader(append(append([]byte{}, chunk1...), chunk2...)), repb.DigestFunction_BLAKE3)
-	require.NoError(t, err)
-
-	_, err = casClient.SpliceBlob(ctx, &repb.SpliceBlobRequest{
-		BlobDigest:     blobDigest,
-		ChunkDigests:   []*repb.Digest{chunk2Digest, chunk1Digest},
-		DigestFunction: repb.DigestFunction_BLAKE3,
-	})
-	require.Error(t, err)
-	require.True(t, status.IsInvalidArgumentError(err), "expected InvalidArgumentError, got: %v", err)
-}
-
-func TestBatchUpdateRejectsCompressedBlobWithDigestMismatch(t *testing.T) {
-	ctx := context.Background()
-	te := testenv.GetTestEnv(t)
-	flags.Set(t, "cache.zstd_transcoding_enabled", true)
-	clientConn := runCASServer(ctx, t, te)
-	casClient := repb.NewContentAddressableStorageClient(clientConn)
-
-	// Compress "actual content" but declare the digest of "differ content"
-	// (same length, different hash). The decompression succeeds but the
-	// resulting hash does not match, which is a distinct path from a corrupt
-	// zstd frame (TestBatchUpdateRejectsCorruptCompressedBlob).
-	actualBlob := []byte("actual content")
-	compressedBlob := compression.CompressZstd(nil, actualBlob)
-
-	differentBlob := []byte("differ content") // same length, different hash
-	differentDigest, err := digest.Compute(bytes.NewReader(differentBlob), repb.DigestFunction_SHA256)
-	require.NoError(t, err)
-
-	rsp, err := casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{
-		Requests: []*repb.BatchUpdateBlobsRequest_Request{
-			{Digest: differentDigest, Data: compressedBlob, Compressor: repb.Compressor_ZSTD},
+		{
+			name:      "subset of chunks",
+			chunks:    [][]byte{[]byte("chunk-alpha"), []byte("chunk-beta"), []byte("chunk-gamma")},
+			spliceidx: []int{0, 1}, // omitting chunk-gamma
 		},
-	})
-	require.NoError(t, err)
-	require.Len(t, rsp.GetResponses(), 1)
-	require.Equal(t, int32(gcodes.InvalidArgument), rsp.GetResponses()[0].GetStatus().GetCode())
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			chunkDigests := make([]*repb.Digest, len(tc.chunks))
+			uploadReqs := make([]*repb.BatchUpdateBlobsRequest_Request, len(tc.chunks))
+			for i, chunk := range tc.chunks {
+				d, err := digest.Compute(bytes.NewReader(chunk), repb.DigestFunction_BLAKE3)
+				require.NoError(t, err)
+				chunkDigests[i] = d
+				uploadReqs[i] = &repb.BatchUpdateBlobsRequest_Request{Digest: d, Data: chunk}
+			}
+			_, err := casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{
+				Requests:       uploadReqs,
+				DigestFunction: repb.DigestFunction_BLAKE3,
+			})
+			require.NoError(t, err)
+
+			blobDigest, err := digest.Compute(bytes.NewReader(bytes.Join(tc.chunks, nil)), repb.DigestFunction_BLAKE3)
+			require.NoError(t, err)
+
+			spliceChunks := make([]*repb.Digest, len(tc.spliceidx))
+			for i, idx := range tc.spliceidx {
+				spliceChunks[i] = chunkDigests[idx]
+			}
+			_, err = casClient.SpliceBlob(ctx, &repb.SpliceBlobRequest{
+				BlobDigest:     blobDigest,
+				ChunkDigests:   spliceChunks,
+				DigestFunction: repb.DigestFunction_BLAKE3,
+			})
+			require.True(t, status.IsInvalidArgumentError(err), "expected InvalidArgumentError, got: %v", err)
+		})
+	}
 }
 
 func TestBatchUpdateMalformedDigestFailsEntireBatch(t *testing.T) {
@@ -1655,51 +1669,6 @@ func TestBatchUpdateMalformedDigestFailsEntireBatch(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotEmpty(t, missingResp.GetMissingBlobDigests(), "valid entry must not be written when any batch entry has a malformed digest")
-}
-
-func TestSpliceBlobRejectsSubsetChunks(t *testing.T) {
-	fp := enableChunkingForTest(t)
-
-	ctx := context.Background()
-	te := testenv.GetTestEnv(t)
-	te.SetExperimentFlagProvider(fp)
-
-	clientConn := runCASServer(ctx, t, te)
-	casClient := repb.NewContentAddressableStorageClient(clientConn)
-
-	chunk1 := []byte("chunk-alpha")
-	chunk2 := []byte("chunk-beta")
-	chunk3 := []byte("chunk-gamma")
-	chunk1Digest, err := digest.Compute(bytes.NewReader(chunk1), repb.DigestFunction_BLAKE3)
-	require.NoError(t, err)
-	chunk2Digest, err := digest.Compute(bytes.NewReader(chunk2), repb.DigestFunction_BLAKE3)
-	require.NoError(t, err)
-	chunk3Digest, err := digest.Compute(bytes.NewReader(chunk3), repb.DigestFunction_BLAKE3)
-	require.NoError(t, err)
-
-	_, err = casClient.BatchUpdateBlobs(ctx, &repb.BatchUpdateBlobsRequest{
-		Requests: []*repb.BatchUpdateBlobsRequest_Request{
-			{Digest: chunk1Digest, Data: chunk1},
-			{Digest: chunk2Digest, Data: chunk2},
-			{Digest: chunk3Digest, Data: chunk3},
-		},
-		DigestFunction: repb.DigestFunction_BLAKE3,
-	})
-	require.NoError(t, err)
-
-	fullBlob := append(append(append([]byte{}, chunk1...), chunk2...), chunk3...)
-	blobDigest, err := digest.Compute(bytes.NewReader(fullBlob), repb.DigestFunction_BLAKE3)
-	require.NoError(t, err)
-
-	// Providing only 2 of the 3 chunks (omitting chunk3) means the concatenated
-	// data won't match blobDigest, so the server must reject it.
-	_, err = casClient.SpliceBlob(ctx, &repb.SpliceBlobRequest{
-		BlobDigest:     blobDigest,
-		ChunkDigests:   []*repb.Digest{chunk1Digest, chunk2Digest},
-		DigestFunction: repb.DigestFunction_BLAKE3,
-	})
-	require.Error(t, err)
-	require.True(t, status.IsInvalidArgumentError(err), "expected InvalidArgumentError, got: %v", err)
 }
 
 func TestFindMissingBlobsWithChunkedBlob(t *testing.T) {

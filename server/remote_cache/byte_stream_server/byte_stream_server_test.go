@@ -344,45 +344,33 @@ func TestRPCQueryWriteStatusReturnsUnimplemented(t *testing.T) {
 	}
 }
 
-func TestRPCMalformedWrite(t *testing.T) {
+func TestRPCWrite_RejectsInvalidBlob(t *testing.T) {
 	ctx := context.Background()
 	te := testenv.GetTestEnv(t)
 	clientConn := runByteStreamServer(ctx, t, te)
 	bsClient := bspb.NewByteStreamClient(clientConn)
 
-	// Test that a malformed upload (incorrect digest) is rejected.
-	instanceNameDigest, buf := testdigest.RandomCASResourceBuf(t, 1000)
-	buf[0] = ^buf[0] // flip bits in byte to corrupt digest.
-
-	readSeeker := bytes.NewReader(buf)
-	rn, err := digest.CASResourceNameFromProto(instanceNameDigest)
-	if err != nil {
-		t.Fatalf("failed to create resource name: %v", err)
-	}
-	_, _, err = cachetools.UploadFromReader(ctx, bsClient, rn, readSeeker)
-	if !status.IsInvalidArgumentError(err) {
-		t.Fatalf("Expected invalid argument error but got %s", err)
-	}
-}
-
-func TestRPCTooLongWrite(t *testing.T) {
-	ctx := context.Background()
-	te := testenv.GetTestEnv(t)
-	clientConn := runByteStreamServer(ctx, t, te)
-	bsClient := bspb.NewByteStreamClient(clientConn)
-
-	// Test that a malformed upload (wrong bytesize) is rejected.
-	rnProto, buf := testdigest.RandomCASResourceBuf(t, 1000)
-	rnProto.Digest.SizeBytes += 1 // increment expected byte count by 1 to trigger mismatch.
-	instanceNameDigest, err := digest.CASResourceNameFromProto(rnProto)
-	if err != nil {
-		t.Fatalf("failed to create resource name: %v", err)
-	}
-
-	readSeeker := bytes.NewReader(buf)
-	_, _, err = cachetools.UploadFromReader(ctx, bsClient, instanceNameDigest, readSeeker)
-	if !status.IsInvalidArgumentError(err) {
-		t.Fatalf("Expected invalid argument error but got %s", err)
+	for _, tc := range []struct {
+		name    string
+		corrupt func(rn *rspb.ResourceName, buf []byte)
+	}{
+		{
+			name:    "hash mismatch",
+			corrupt: func(rn *rspb.ResourceName, buf []byte) { buf[0] = ^buf[0] },
+		},
+		{
+			name:    "size mismatch",
+			corrupt: func(rn *rspb.ResourceName, buf []byte) { rn.Digest.SizeBytes++ },
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rnProto, buf := testdigest.RandomCASResourceBuf(t, 1000)
+			tc.corrupt(rnProto, buf)
+			rn, err := digest.CASResourceNameFromProto(rnProto)
+			require.NoError(t, err)
+			_, _, err = cachetools.UploadFromReader(ctx, bsClient, rn, bytes.NewReader(buf))
+			require.True(t, status.IsInvalidArgumentError(err), "expected InvalidArgument, got: %v", err)
+		})
 	}
 }
 

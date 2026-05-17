@@ -3,6 +3,12 @@ package remote_cache_test
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +26,7 @@ import (
 	capb "github.com/buildbuddy-io/buildbuddy/proto/cache"
 	cappb "github.com/buildbuddy-io/buildbuddy/proto/capability"
 	inpb "github.com/buildbuddy-io/buildbuddy/proto/invocation"
+	bspb "google.golang.org/genproto/googleapis/bytestream"
 )
 
 var (
@@ -233,6 +240,69 @@ func TestBuild_RemoteCacheFlags_Compression_SecondBuildIsCached(t *testing.T) {
 	)
 }
 
+func TestBuild_RemoteCache_RemoteBuildEventUploadAllUploadsLocalOutput(t *testing.T) {
+	app := buildbuddy_enterprise.RunWithConfig(t, buildbuddy_enterprise.DefaultAppConfig(t), buildbuddy_enterprise.NoAuthConfig)
+	ctx := context.Background()
+	ws := testbazel.MakeTempModule(t, map[string]string{
+		"BUILD": `genrule(
+    name = "foo",
+    outs = ["foo.txt"],
+    cmd_bash = "echo 'foo bar' > $@",
+    tags = ["no-remote"],
+)`,
+	})
+	bepJSONPath := filepath.Join(ws, "bep.json")
+	buildFlags := []string{
+		"//:foo",
+		"--remote_build_event_upload=all",
+		"--build_event_json_file=" + bepJSONPath,
+	}
+	buildFlags = append(buildFlags, app.BESBazelFlags()...)
+	buildFlags = append(buildFlags, app.RemoteCacheBazelFlags()...)
+
+	result := testbazel.Invoke(ctx, t, ws, "build", buildFlags...)
+
+	require.NoError(t, result.Error)
+	assert.Contains(t, result.Stderr, "Build completed successfully")
+	bytestreamURI := findBEPFileURI(t, bepJSONPath, "foo.txt")
+	assert.True(t, strings.HasPrefix(bytestreamURI, "bytestream://"), "BEP output URI should be a bytestream URI")
+	blob := readBytestreamURI(t, ctx, app.ByteStreamClient(t), bytestreamURI)
+	assert.Equal(t, "foo bar\n", string(blob))
+}
+
+func TestBuild_RemoteCache_RemoteDownloadMinimalBEPReferencesBytestream(t *testing.T) {
+	app := buildbuddy_enterprise.RunWithConfig(t, buildbuddy_enterprise.DefaultAppConfig(t), buildbuddy_enterprise.NoAuthConfig)
+	ctx := context.Background()
+	ws := testbazel.MakeTempModule(t, map[string]string{
+		"BUILD": `genrule(
+    name = "foo",
+    outs = ["foo.txt"],
+    cmd_bash = "echo 'foo bar' > $@",
+)`,
+	})
+	buildFlags := []string{"//:foo"}
+	buildFlags = append(buildFlags, app.RemoteCacheBazelFlags()...)
+
+	result := testbazel.Invoke(ctx, t, ws, "build", buildFlags...)
+	require.NoError(t, result.Error)
+	assert.Contains(t, result.Stderr, "Build completed successfully")
+
+	testbazel.Clean(ctx, t, ws)
+	bepJSONPath := filepath.Join(ws, "bep.json")
+	buildFlags = append(buildFlags, "--remote_download_minimal", "--build_event_json_file="+bepJSONPath)
+	result = testbazel.Invoke(ctx, t, ws, "build", buildFlags...)
+
+	require.NoError(t, result.Error)
+	assert.Contains(t, result.Stderr, "Build completed successfully")
+	assert.Contains(t, result.Stderr, "1 remote cache hit")
+	bepJSON := testfsReadFile(t, bepJSONPath)
+	assert.NotContains(t, bepJSON, "file://")
+	bytestreamURI := findBEPFileURI(t, bepJSONPath, "foo.txt")
+	assert.True(t, strings.HasPrefix(bytestreamURI, "bytestream://"), "BEP output URI should be a bytestream URI")
+	blob := readBytestreamURI(t, ctx, app.ByteStreamClient(t), bytestreamURI)
+	assert.Equal(t, "foo bar\n", string(blob))
+}
+
 func TestBuild_RemoteCache_ScoreCard(t *testing.T) {
 	app := buildbuddy_enterprise.RunWithConfig(
 		t, buildbuddy_enterprise.DefaultAppConfig(t), buildbuddy_enterprise.NoAuthConfig,
@@ -373,4 +443,39 @@ func newUUID(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return id.String()
+}
+
+func findBEPFileURI(t *testing.T, bepJSONPath, name string) string {
+	t.Helper()
+	bepJSON := testfsReadFile(t, bepJSONPath)
+	re := regexp.MustCompile(`(?s)"name":"` + regexp.QuoteMeta(name) + `"[^{}]*"uri":"(bytestream://[^"]+)"`)
+	matches := re.FindStringSubmatch(bepJSON)
+	require.Len(t, matches, 2, "BEP JSON should contain a bytestream URI for %q:\n%s", name, bepJSON)
+	return matches[1]
+}
+
+func testfsReadFile(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return string(b)
+}
+
+func readBytestreamURI(t *testing.T, ctx context.Context, client bspb.ByteStreamClient, bytestreamURI string) []byte {
+	t.Helper()
+	u, err := url.Parse(bytestreamURI)
+	require.NoError(t, err)
+	resourceName := strings.TrimPrefix(u.Path, "/")
+	require.NotEmpty(t, resourceName, "bytestream URI should include a resource name")
+	stream, err := client.Read(ctx, &bspb.ReadRequest{ResourceName: resourceName})
+	require.NoError(t, err)
+	var out []byte
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			return out
+		}
+		require.NoError(t, err)
+		out = append(out, res.GetData()...)
+	}
 }

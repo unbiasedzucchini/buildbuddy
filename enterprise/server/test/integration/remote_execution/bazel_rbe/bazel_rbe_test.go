@@ -5,7 +5,13 @@ package bazel_rbe_test
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/buildbuddy-io/buildbuddy/enterprise/server/remote_execution/commandutil"
@@ -18,6 +24,8 @@ import (
 	"github.com/buildbuddy-io/buildbuddy/server/util/testing/flags"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	bspb "google.golang.org/genproto/googleapis/bytestream"
 )
 
 const (
@@ -324,6 +332,56 @@ func TestTransientCacheNotFoundError_Retried(t *testing.T) {
 	assert.Equal(t, 2, GetNumExecutionsFlushedToOLAPDB(t, env))
 }
 
+func TestRemoteExecution_MinimalBuildEventUploadReferencesBytestream(t *testing.T) {
+	env := setup(t)
+	ctx := context.Background()
+	ws := testbazel.MakeTempModule(t, map[string]string{
+		"defs.bzl": `
+def _exec_impl(ctx):
+  out = ctx.actions.declare_file(ctx.label.name + ".txt")
+  ctx.actions.run_shell(
+    outputs = [out],
+    command = "echo remote-output > %s" % out.path,
+  )
+  return [DefaultInfo(files = depset([out]))]
+
+exec = rule(implementation = _exec_impl)
+`,
+		"BUILD": fmt.Sprintf(`load(":defs.bzl", "exec")
+
+exec(
+  name = "exec",
+  exec_properties = {
+    "OSFamily": "%s",
+    "Arch": "%s",
+  },
+)`, runtime.GOOS, runtime.GOARCH),
+	})
+	bepJSONPath := filepath.Join(ws, "bep.json")
+	buildArgs := []string{
+		":exec",
+		"--remote_executor=" + env.GetRemoteExecutionTarget(),
+		"--bes_backend=" + env.GetBuildBuddyServerTarget(),
+		"--remote_retries=" + fmt.Sprintf("%d", bazelRemoteRetries),
+		"--remote_download_minimal",
+		"--remote_build_event_upload=minimal",
+		"--build_event_json_file=" + bepJSONPath,
+	}
+
+	res := testbazel.Invoke(ctx, t, ws, "build", buildArgs...)
+
+	require.NoError(t, res.Error)
+	assert.Contains(t, res.Stderr, "Build completed successfully")
+	assert.Contains(t, res.Stderr, "1 remote")
+	bytestreamURI := findBEPFileURI(t, bepJSONPath, "exec.txt")
+	assert.True(t, strings.HasPrefix(bytestreamURI, "bytestream://"), "BEP output URI should be a bytestream URI")
+	blob := readBytestreamURI(t, ctx, env.GetByteStreamClient(), bytestreamURI)
+	assert.Equal(t, "remote-output\n", string(blob))
+	env.ShutdownBuildBuddyServers()
+	assert.Equal(t, 1, GetNumInvocationsFlushedToOLAPDB(t, env))
+	assert.Equal(t, 1, GetNumExecutionsFlushedToOLAPDB(t, env))
+}
+
 func TestActionWithContainerImage_InvalidArgument(t *testing.T) {
 	env := setup(t)
 	ctx := context.Background()
@@ -448,4 +506,34 @@ exec(
 	}
 	buildArgs = append(buildArgs, extraBazelArgs...)
 	return testbazel.Invoke(ctx, t, ws, "build", buildArgs...)
+}
+
+func findBEPFileURI(t *testing.T, bepJSONPath, name string) string {
+	t.Helper()
+	b, err := os.ReadFile(bepJSONPath)
+	require.NoError(t, err)
+	bepJSON := string(b)
+	re := regexp.MustCompile(`(?s)"name":"` + regexp.QuoteMeta(name) + `"[^{}]*"uri":"(bytestream://[^"]+)"`)
+	matches := re.FindStringSubmatch(bepJSON)
+	require.Len(t, matches, 2, "BEP JSON should contain a bytestream URI for %q:\n%s", name, bepJSON)
+	return matches[1]
+}
+
+func readBytestreamURI(t *testing.T, ctx context.Context, client bspb.ByteStreamClient, bytestreamURI string) []byte {
+	t.Helper()
+	u, err := url.Parse(bytestreamURI)
+	require.NoError(t, err)
+	resourceName := strings.TrimPrefix(u.Path, "/")
+	require.NotEmpty(t, resourceName, "bytestream URI should include a resource name")
+	stream, err := client.Read(ctx, &bspb.ReadRequest{ResourceName: resourceName})
+	require.NoError(t, err)
+	var out []byte
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			return out
+		}
+		require.NoError(t, err)
+		out = append(out, res.GetData()...)
+	}
 }
